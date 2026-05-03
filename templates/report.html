@@ -1,0 +1,339 @@
+{% extends "index.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block extra_style %}
+/* PERIOD TOGGLE */
+.report-controls { display:flex; gap:8px; margin-bottom:24px; align-items:center; }
+.period-btn { padding:8px 18px; border-radius:var(--radius); font-family:var(--mono); font-size:11px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--muted); transition:all .15s; }
+.period-btn.active { background:var(--accent); color:#000; border-color:var(--accent); }
+
+/* SECTION HEADER */
+.section-header { display:flex; align-items:center; gap:12px; margin:32px 0 16px; }
+.section-label { font-family:var(--display); font-size:18px; font-weight:800; }
+.section-line { flex:1; height:1px; background:var(--border); }
+
+/* OVERALL CARD */
+.overall-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 24px;
+  align-items: center;
+}
+.overall-pct {
+  font-family: var(--display);
+  font-size: 56px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+.overall-meta { display:flex; flex-direction:column; gap:10px; }
+.overall-bar-wrap { background:var(--surface2); border-radius:4px; height:6px; overflow:hidden; }
+.overall-bar-fill { height:100%; border-radius:4px; transition:width .6s ease; }
+.overall-tags { display:flex; gap:8px; flex-wrap:wrap; }
+.tag {
+  font-family:var(--mono); font-size:10px; padding:3px 9px;
+  border-radius:20px; border:1px solid;
+}
+.tag-success { background:#6bffd410; color:var(--success); border-color:#6bffd430; }
+.tag-partial  { background:#ffd06b10; color:var(--partial); border-color:#ffd06b30; }
+.tag-fail     { background:#ff6b6b10; color:var(--fail);    border-color:#ff6b6b30; }
+
+/* TYPE CARD */
+.type-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.type-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background .15s;
+  user-select: none;
+}
+.type-card-header:hover { background: var(--surface2); }
+.type-card-title { font-family:var(--display); font-size:15px; font-weight:700; }
+.type-card-meta { font-size:12px; color:var(--muted); margin-top:2px; }
+.type-card-right { display:flex; align-items:center; gap:12px; }
+.type-card-body {
+  padding: 0 20px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .35s ease, padding .35s;
+}
+.type-card-body.open { max-height: 2000px; padding: 0 20px 20px; }
+.expand-icon { font-size:12px; color:var(--muted); transition:transform .3s; }
+.type-card-header.open .expand-icon { transform:rotate(180deg); }
+
+/* TYPE HEATMAP ROW */
+.type-heatmap-row { margin-bottom:16px; }
+.type-heatmap-label { font-family:var(--mono); font-size:10px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+
+/* TASK ROWS inside type */
+.task-row {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.task-row-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.task-row-name { font-family:var(--display); font-size:13px; font-weight:700; }
+.task-row-meta { font-size:11px; color:var(--muted); margin-bottom:6px; }
+
+/* LEGEND */
+.legend { display:flex; gap:16px; margin-bottom:20px; }
+.legend-item { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; color:var(--muted); }
+.legend-dot { width:10px; height:10px; border-radius:3px; }
+{% endblock %}
+
+{% block content %}
+<div class="panel-header">
+  <div class="panel-sub">Visualize your consistency</div>
+  <div class="panel-title">Reports</div>
+</div>
+
+<div class="report-controls">
+  <button class="period-btn active" id="pbtn-weekly"  onclick="setPeriod('weekly')">Weekly (7d)</button>
+  <button class="period-btn"        id="pbtn-monthly" onclick="setPeriod('monthly')">Monthly (30d)</button>
+  <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="loadReport()">↻ Refresh</button>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>Full success</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--partial)"></div>Partial</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff6b6b33;border:1px solid #ff6b6b40"></div>Missed</div>
+</div>
+
+<div id="report-root"></div>
+{% endblock %}
+
+{% block extra_script %}
+let reportPeriod = 'weekly';
+
+function setPeriod(p) {
+  reportPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pbtn-' + p).classList.add('active');
+  loadReport();
+}
+
+async function loadReport() {
+  document.getElementById('report-root').innerHTML =
+    `<div class="empty-state"><div class="empty-icon" style="animation:pulse 1s infinite">◈</div><div class="empty-text">Loading…</div></div>`;
+  const r    = await fetch('/api/report?period=' + reportPeriod);
+  const data = await r.json();
+  renderReport(data);
+}
+
+// ── SHARED HELPERS ───────────────────────────────────────────────────────────
+
+function heatmap(dates, dayStatus) {
+  return dates.map(d => {
+    const res = dayStatus[d] || 'fail';
+    const dt  = new Date(d + 'T00:00:00');
+    const lbl = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ': ' + res;
+    return `<div class="heat-day ${res}" title="${lbl}"></div>`;
+  }).join('');
+}
+
+function barChart(dates, dayStatus) {
+  const dayLabels = dates.map(d =>
+    new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short'}).slice(0,1));
+  return `
+    <div class="bar-chart">
+      ${dates.map((d,i) => {
+        const res = dayStatus[d] || 'fail';
+        const h   = res==='success'?100:res==='partial'?55:8;
+        const col = res==='success'?'var(--success)':res==='partial'?'var(--partial)':'#ff6b6b44';
+        return `<div class="bar-col"><div class="bar" style="height:${h}%;background:${col}"></div><div class="bar-label">${dayLabels[i]}</div></div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+
+function renderReport(data) {
+  const root  = document.getElementById('report-root');
+  const dates = data.date_range;
+
+  if (!data.task_stats.length) {
+    root.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">No tasks to report on yet.</div></div>`;
+    return;
+  }
+
+  root.innerHTML =
+    renderOverall(data, dates) +
+    renderTypeSummary(data, dates) +
+    renderTaskWise(data, dates);
+}
+
+// ── OVERALL ──────────────────────────────────────────────────────────────────
+
+function renderOverall(data, dates) {
+  const ov   = data.overall;
+  const pct  = ov.pct;
+  const col  = pct>=70?'var(--success)':pct>=40?'var(--partial)':'var(--fail)';
+  const stats = data.task_stats;
+
+  const successDays = dates.filter(d => ov.day_status[d]==='success').length;
+  const partialDays = dates.filter(d => ov.day_status[d]==='partial').length;
+  const failDays    = dates.filter(d => ov.day_status[d]==='fail').length;
+
+  const sorted = [...stats].sort((a,b)=>b.success_pct-a.success_pct);
+  const best   = sorted[0];
+  const worst  = sorted[sorted.length-1];
+
+  return `
+    <div class="section-header">
+      <div class="section-label">Overall</div>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="overall-card">
+      <div class="overall-pct" style="color:${col}">${pct}%</div>
+      <div class="overall-meta">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">${ov.total_tasks} tasks · ${dates.length} days tracked</div>
+        <div class="overall-bar-wrap">
+          <div class="overall-bar-fill" style="width:${pct}%;background:${col}"></div>
+        </div>
+        <div class="overall-tags">
+          <span class="tag tag-success">✓ ${successDays}d perfect</span>
+          <span class="tag tag-partial">◑ ${partialDays}d partial</span>
+          <span class="tag tag-fail">✕ ${failDays}d missed</span>
+        </div>
+        ${best ? `<div style="font-size:12px;color:var(--muted)">
+          🏆 <span style="color:var(--success)">${esc(best.name)}</span> is your best (${best.success_pct}%)
+          ${worst && worst.id!==best.id ? `· ⚠ <span style="color:var(--fail)">${esc(worst.name)}</span> needs work (${worst.success_pct}%)` : ''}
+        </div>` : ''}
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Day-by-day overview</div>
+      <div class="heatmap" style="margin-bottom:12px">${heatmap(dates, ov.day_status)}</div>
+      ${dates.length > 1 ? barChart(dates, ov.day_status) : ''}
+    </div>
+  `;
+}
+
+// ── TYPE SUMMARY ─────────────────────────────────────────────────────────────
+
+function renderTypeSummary(data, dates) {
+  const ts = data.type_summary;
+  const entries = Object.values(ts).sort((a,b) => b.avg_pct - a.avg_pct);
+
+  const rows = entries.map(t => {
+    const col = t.avg_pct>=70?'var(--success)':t.avg_pct>=40?'var(--partial)':'var(--fail)';
+    return `
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-family:var(--display);font-size:15px;font-weight:700">${esc(t.type)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">
+              ${t.task_count} task${t.task_count!==1?'s':''} ·
+              <span style="color:var(--success)">✓ ${t.success_days}d</span> ·
+              <span style="color:var(--partial)">◑ ${t.partial_days}d</span> ·
+              <span style="color:var(--fail)">✕ ${t.fail_days}d</span>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--display);font-size:28px;font-weight:800;color:${col}">${t.avg_pct}%</div>
+            <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">avg success</div>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:12px">
+          <div style="height:100%;width:${t.avg_pct}%;background:${col};border-radius:4px;transition:width .6s"></div>
+        </div>
+        <div class="heatmap">${heatmap(dates, t.day_status)}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="section-header">
+      <div class="section-label">By Category</div>
+      <div class="section-line"></div>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${entries.length} categories</span>
+    </div>
+    ${rows}
+  `;
+}
+
+// ── TASK-WISE ─────────────────────────────────────────────────────────────────
+
+function renderTaskWise(data, dates) {
+  const ts = data.type_summary;
+  const entries = Object.values(ts).sort((a,b) => b.avg_pct - a.avg_pct);
+
+  const cards = entries.map((typeData, idx) => {
+    const tasks = [...typeData.tasks].sort((a,b) => b.success_pct - a.success_pct);
+    const taskRows = tasks.map(s => {
+      const pc  = pctClass(s.success_pct);
+      return `
+        <div class="task-row">
+          <div class="task-row-header">
+            <div>
+              <div class="task-row-name">
+                ${esc(s.name)}${s.subtask?` <span style="color:var(--muted);font-weight:400;font-size:11px">/ ${esc(s.subtask)}</span>`:''}
+                <span class="freq-badge">${s.frequency}×/day</span>
+              </div>
+            </div>
+            <span class="pct-badge ${pc}">${s.success_pct}%</span>
+          </div>
+          <div class="task-row-meta">
+            ✓ ${s.success_days}d · ◑ ${s.partial_days}d · ✕ ${s.fail_days}d missed
+          </div>
+          <div class="heatmap">${heatmap(dates, s.daily_results)}</div>
+          ${dates.length > 1 ? barChart(dates, s.daily_results) : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="type-card" id="tcard-${idx}">
+        <div class="type-card-header" onclick="toggleCard(${idx})" id="tcard-hdr-${idx}">
+          <div>
+            <div class="type-card-title">${esc(typeData.type)}</div>
+            <div class="type-card-meta">${tasks.length} task${tasks.length!==1?'s':''} · ${typeData.avg_pct}% avg</div>
+          </div>
+          <div class="type-card-right">
+            <span class="pct-badge ${pctClass(typeData.avg_pct)}">${typeData.avg_pct}%</span>
+            <span class="expand-icon">▼</span>
+          </div>
+        </div>
+        <div class="type-card-body" id="tcard-body-${idx}">
+          ${taskRows}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="section-header">
+      <div class="section-label">Task Breakdown</div>
+      <div class="section-line"></div>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${data.task_stats.length} tasks total</span>
+    </div>
+    ${cards}
+  `;
+}
+
+function toggleCard(idx) {
+  const body = document.getElementById('tcard-body-'+idx);
+  const hdr  = document.getElementById('tcard-hdr-'+idx);
+  body.classList.toggle('open');
+  hdr.classList.toggle('open');
+}
+
+loadReport();
+{% endblock %}

@@ -1,0 +1,251 @@
+{% extends "index.html" %}
+{% block title %}Daily Tracker{% endblock %}
+
+{% block extra_style %}
+.tracker-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.date-display {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--accent);
+  flex: 1;
+  text-align: center;
+}
+.tracker-group { margin-bottom: 24px; }
+.tracker-task {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  transition: border-color .2s;
+}
+.tracker-task.all-done { border-color: #6bffd430; }
+.tracker-task-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.tracker-task-name { font-family:var(--display); font-size:13px; font-weight:700; }
+.checkboxes { display:flex; gap:10px; flex-wrap:wrap; }
+.check-item { display:flex; align-items:center; gap:7px; cursor:pointer; }
+.check-item input[type="checkbox"] {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  appearance: none;
+  background: var(--surface2);
+  cursor: pointer;
+  position: relative;
+  transition: all .15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.check-item input[type="checkbox"]:checked { background:var(--accent); border-color:var(--accent); }
+.check-item input[type="checkbox"]:checked::after {
+  content:'✓'; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%); color:#000; font-size:11px; font-weight:700;
+}
+.check-label { font-family:var(--mono); font-size:11px; color:var(--muted); }
+.tracker-progress { height:3px; background:var(--surface2); border-radius:2px; margin-top:10px; overflow:hidden; }
+.tracker-progress-fill { height:100%; border-radius:2px; transition:width .3s ease, background .3s; }
+
+/* Daily summary bar */
+.day-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.day-summary-pct {
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+}
+.day-summary-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.day-big-bar { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.day-big-fill { height: 100%; border-radius: 4px; transition: width .5s ease, background .5s; }
+{% endblock %}
+
+{% block content %}
+<div class="panel-header">
+  <div class="panel-sub">Mark your daily completions</div>
+  <div class="panel-title">Daily Tracker</div>
+</div>
+
+<div class="tracker-date-nav">
+  <button class="btn btn-ghost" onclick="changeDate(-1)">← Prev</button>
+  <div class="date-display" id="tracker-date-display"></div>
+  <button class="btn btn-ghost" id="btn-next" onclick="changeDate(1)">Next →</button>
+</div>
+
+<!-- Daily summary -->
+<div class="day-summary" id="day-summary">
+  <div>
+    <div class="day-summary-pct" id="day-pct" style="color:var(--accent)">—</div>
+    <div class="day-summary-label">today's completion</div>
+  </div>
+  <div class="day-big-bar"><div class="day-big-fill" id="day-big-fill" style="width:0%;background:var(--accent)"></div></div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="day-counts">0 / 0 tasks done</div>
+</div>
+
+<div id="tracker-container"></div>
+{% endblock %}
+
+{% block extra_script %}
+let tasks = [];
+let logs  = [];
+let currentDate = new Date();
+
+async function init() {
+  const r = await fetch('/api/tasks');
+  tasks = await r.json();
+  await renderTracker();
+}
+
+function dateStr(d) { return d.toISOString().split('T')[0]; }
+
+function changeDate(delta) {
+  const next = new Date(currentDate);
+  next.setDate(next.getDate() + delta);
+  const today = new Date(); today.setHours(23,59,59,0);
+  if (next > today) return;
+  currentDate = next;
+  renderTracker();
+}
+
+async function renderTracker() {
+  const ds    = dateStr(currentDate);
+  const today = dateStr(new Date());
+  const isToday = ds === today;
+
+  document.getElementById('tracker-date-display').textContent = isToday
+    ? `Today — ${currentDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}`
+    : currentDate.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+  document.getElementById('btn-next').disabled = isToday;
+  document.getElementById('btn-next').style.opacity = isToday ? '0.4' : '1';
+
+  const r = await fetch('/api/logs?date=' + ds);
+  logs = await r.json();
+
+  const container = document.getElementById('tracker-container');
+  if (!tasks.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">No tasks yet. Add some in Manage Tasks first!</div></div>`;
+    updateDaySummary(0, 0);
+    return;
+  }
+
+  const groups = {};
+  tasks.forEach(t => { if (!groups[t.type]) groups[t.type]=[]; groups[t.type].push(t); });
+
+  container.innerHTML = Object.entries(groups).map(([type, items]) => `
+    <div class="tracker-group">
+      <div class="type-header">
+        <span class="type-badge">${esc(type)}</span>
+        <div class="type-line"></div>
+      </div>
+      ${items.map(t => renderTrackerTask(t, ds)).join('')}
+    </div>
+  `).join('');
+
+  recalcDaySummary();
+}
+
+function renderTrackerTask(t, ds) {
+  const freq   = parseInt(t.frequency);
+  const checks = Array.from({length:freq}, (_,i) => {
+    const log = logs.find(l => l.task_id===t.id && l.occurrence===String(i+1));
+    return log && log.done==='1';
+  });
+  const doneCount = checks.filter(Boolean).length;
+  const pct       = Math.round(doneCount / freq * 100);
+  const allDone   = doneCount === freq;
+
+  return `
+    <div class="tracker-task${allDone?' all-done':''}" id="ttask-${t.id}">
+      <div class="tracker-task-header">
+        <div>
+          <div class="tracker-task-name">
+            ${esc(t.name)}${t.subtask?` <span style="color:var(--muted);font-weight:400;font-size:11px">/ ${esc(t.subtask)}</span>`:''}
+          </div>
+          ${t.description?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
+        </div>
+        <span id="count-${t.id}" style="font-family:var(--mono);font-size:11px;color:${pct===100?'var(--success)':pct>0?'var(--partial)':'var(--muted)'}">${doneCount}/${freq}</span>
+      </div>
+      <div class="checkboxes">
+        ${Array.from({length:freq},(_,i) => `
+          <label class="check-item">
+            <input type="checkbox" ${checks[i]?'checked':''} onchange="toggleCheck('${t.id}',${i+1},this.checked,'${ds}')">
+            <span class="check-label">#${i+1}</span>
+          </label>
+        `).join('')}
+      </div>
+      <div class="tracker-progress">
+        <div class="tracker-progress-fill" id="prog-${t.id}"
+          style="width:${pct}%;background:${pct===100?'var(--success)':pct>0?'var(--partial)':'var(--accent)'}"></div>
+      </div>
+    </div>
+  `;
+}
+
+async function toggleCheck(taskId, occurrence, done, ds) {
+  await fetch('/api/logs', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({date:ds, task_id:taskId, occurrence, done})
+  });
+
+  // update logs cache for this task
+  const key = logs.findIndex(l => l.task_id===taskId && l.occurrence===String(occurrence));
+  if (key >= 0) logs[key].done = done?'1':'0';
+  else logs.push({date:ds, task_id:taskId, occurrence:String(occurrence), done:done?'1':'0'});
+
+  // update task UI
+  const task = tasks.find(t => t.id===taskId);
+  const freq = parseInt(task.frequency);
+  const doneCount = Array.from({length:freq},(_,i) => {
+    const l = logs.find(l=>l.task_id===taskId && l.occurrence===String(i+1));
+    return l && l.done==='1';
+  }).filter(Boolean).length;
+  const pct = Math.round(doneCount/freq*100);
+
+  const bar   = document.getElementById('prog-'+taskId);
+  const count = document.getElementById('count-'+taskId);
+  const box   = document.getElementById('ttask-'+taskId);
+  if (bar)   { bar.style.width = pct+'%'; bar.style.background = pct===100?'var(--success)':pct>0?'var(--partial)':'var(--accent)'; }
+  if (count) { count.textContent=`${doneCount}/${freq}`; count.style.color=pct===100?'var(--success)':pct>0?'var(--partial)':'var(--muted)'; }
+  if (box)   { box.classList.toggle('all-done', doneCount===freq); }
+
+  recalcDaySummary();
+}
+
+function recalcDaySummary() {
+  let total = 0, done = 0;
+  tasks.forEach(t => {
+    const freq = parseInt(t.frequency);
+    total += freq;
+    for (let i=1; i<=freq; i++) {
+      const l = logs.find(l => l.task_id===t.id && l.occurrence===String(i));
+      if (l && l.done==='1') done++;
+    }
+  });
+  updateDaySummary(done, total);
+}
+
+function updateDaySummary(done, total) {
+  const pct  = total ? Math.round(done/total*100) : 0;
+  const col  = pct===100?'var(--success)':pct>=50?'var(--partial)':'var(--accent)';
+  document.getElementById('day-pct').textContent   = pct+'%';
+  document.getElementById('day-pct').style.color   = col;
+  document.getElementById('day-big-fill').style.width      = pct+'%';
+  document.getElementById('day-big-fill').style.background = col;
+  document.getElementById('day-counts').textContent = `${done} / ${total} checks done`;
+}
+
+init();
+{% endblock %}

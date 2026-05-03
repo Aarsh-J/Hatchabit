@@ -1,0 +1,155 @@
+{% extends "index.html" %}
+{% block title %}Manage Tasks{% endblock %}
+
+{% block extra_style %}
+.task-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: border-color .15s;
+}
+.task-info { flex: 1; }
+.task-name {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.task-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+.delete-btn {
+  background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 14px; padding: 4px;
+  border-radius: 4px; transition: all .15s; opacity: 0;
+}
+.task-item:hover .delete-btn { opacity: 1; }
+.delete-btn:hover { color: var(--fail); background: #ff6b6b15; }
+.type-group { margin-bottom: 28px; }
+{% endblock %}
+
+{% block content %}
+<div class="panel-header">
+  <div class="panel-sub">Configure your habits &amp; routines</div>
+  <div class="panel-title">Manage Tasks</div>
+</div>
+
+<!-- Add Task Form -->
+<div class="card">
+  <div class="card-title">+ Add New Task</div>
+  <div class="form-row">
+    <div>
+      <label>Type / Category</label>
+      <input type="text" id="form-type" placeholder="e.g. Physical, Mental, Work" list="type-suggestions">
+      <datalist id="type-suggestions"></datalist>
+    </div>
+    <div>
+      <label>Task Name</label>
+      <input type="text" id="form-name" placeholder="e.g. Mobility Exercises">
+    </div>
+  </div>
+  <div class="form-row three">
+    <div>
+      <label>Sub-task (optional)</label>
+      <input type="text" id="form-subtask" placeholder="e.g. Running">
+    </div>
+    <div>
+      <label>Description</label>
+      <input type="text" id="form-desc" placeholder="e.g. Run 20 mins">
+    </div>
+    <div>
+      <label>Times/Day</label>
+      <input type="number" id="form-freq" value="1" min="1" max="10">
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+</div>
+
+<!-- Task List -->
+<div id="task-list-container"></div>
+{% endblock %}
+
+{% block extra_script %}
+let tasks = [];
+
+async function loadTasks() {
+  const r = await fetch('/api/tasks');
+  tasks = await r.json();
+  updateTypeSuggestions();
+  renderTaskList();
+}
+
+function updateTypeSuggestions() {
+  const types = [...new Set(tasks.map(t => t.type).filter(Boolean))];
+  document.getElementById('type-suggestions').innerHTML = types.map(t => `<option value="${esc(t)}">`).join('');
+}
+
+async function addTask() {
+  const type    = document.getElementById('form-type').value.trim();
+  const name    = document.getElementById('form-name').value.trim();
+  const subtask = document.getElementById('form-subtask').value.trim();
+  const desc    = document.getElementById('form-desc').value.trim();
+  const freq    = parseInt(document.getElementById('form-freq').value) || 1;
+  if (!type || !name) { toast('⚠ Type and Task Name are required'); return; }
+
+  await fetch('/api/tasks', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({type, name, subtask, description: desc, frequency: freq})
+  });
+
+  ['form-type','form-name','form-subtask','form-desc'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('form-freq').value = '1';
+  await loadTasks();
+  toast('✓ Task added');
+}
+
+async function deleteTask(id) {
+  await fetch('/api/tasks/' + id, {method:'DELETE'});
+  await loadTasks();
+  toast('Task removed');
+}
+
+function renderTaskList() {
+  const container = document.getElementById('task-list-container');
+  if (!tasks.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">No tasks yet. Add your first one above!</div></div>`;
+    return;
+  }
+
+  const groups = {};
+  tasks.forEach(t => { if (!groups[t.type]) groups[t.type]=[]; groups[t.type].push(t); });
+
+  container.innerHTML = Object.entries(groups).map(([type, items]) => `
+    <div class="type-group">
+      <div class="type-header">
+        <span class="type-badge">${esc(type)}</span>
+        <div class="type-line"></div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${items.length} task${items.length!==1?'s':''}</span>
+      </div>
+      ${items.map(t => `
+        <div class="task-item">
+          <div class="task-info">
+            <div class="task-name">
+              ${esc(t.name)}
+              ${t.subtask ? `<span style="color:var(--muted);font-weight:400">/ ${esc(t.subtask)}</span>` : ''}
+              <span class="freq-badge">${t.frequency}×/day</span>
+            </div>
+            ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+          </div>
+          <button class="delete-btn" onclick="deleteTask('${t.id}')" title="Delete">✕</button>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+loadTasks();
+{% endblock %}
