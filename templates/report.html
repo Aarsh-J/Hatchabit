@@ -3,14 +3,85 @@
 
 {% block extra_style %}
 /* PERIOD TOGGLE */
-.report-controls { display:flex; gap:8px; margin-bottom:24px; align-items:center; }
-.period-btn { padding:8px 18px; border-radius:var(--radius); font-family:var(--mono); font-size:11px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--muted); transition:all .15s; }
-.period-btn.active { background:var(--accent); color:#000; border-color:var(--accent); }
+.report-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.period-btn {
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  transition: all .15s;
+}
+.period-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+/* NAVIGATOR */
+.nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+}
+.nav-arrow {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+  flex-shrink: 0;
+}
+.nav-arrow:hover:not(.disabled) { border-color: var(--accent); color: var(--accent); }
+.nav-arrow.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.nav-label {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+  text-align: center;
+}
+.nav-today-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.nav-today-btn:hover { border-color: var(--accent); color: var(--accent); }
+.nav-today-btn.hidden { visibility: hidden; }
 
 /* SECTION HEADER */
-.section-header { display:flex; align-items:center; gap:12px; margin:32px 0 16px; }
-.section-label { font-family:var(--display); font-size:18px; font-weight:800; }
-.section-line { flex:1; height:1px; background:var(--border); }
+.section-header { display: flex; align-items: center; gap: 12px; margin: 32px 0 16px; }
+.section-label  { font-family: var(--display); font-size: 18px; font-weight: 800; }
+.section-line   { flex: 1; height: 1px; background: var(--border); }
 
 /* OVERALL CARD */
 .overall-card {
@@ -20,28 +91,29 @@
   padding: 24px;
   margin-bottom: 24px;
   display: grid;
-  grid-template-columns: 120px 1fr;
+  grid-template-columns: minmax(100px, max-content) 1fr;
   gap: 24px;
   align-items: center;
 }
 .overall-pct {
   font-family: var(--display);
-  font-size: 56px;
+  font-size: 48px;
   font-weight: 800;
   line-height: 1;
   text-align: center;
+  white-space: nowrap;
 }
-.overall-meta { display:flex; flex-direction:column; gap:10px; }
-.overall-bar-wrap { background:var(--surface2); border-radius:4px; height:6px; overflow:hidden; }
-.overall-bar-fill { height:100%; border-radius:4px; transition:width .6s ease; }
-.overall-tags { display:flex; gap:8px; flex-wrap:wrap; }
+.overall-meta { display: flex; flex-direction: column; gap: 10px; }
+.overall-bar-wrap { background: var(--surface2); border-radius: 4px; height: 6px; overflow: hidden; }
+.overall-bar-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+.overall-tags { display: flex; gap: 8px; flex-wrap: wrap; }
 .tag {
-  font-family:var(--mono); font-size:10px; padding:3px 9px;
-  border-radius:20px; border:1px solid;
+  font-family: var(--mono); font-size: 10px; padding: 3px 9px;
+  border-radius: 20px; border: 1px solid;
 }
-.tag-success { background:#6bffd410; color:var(--success); border-color:#6bffd430; }
-.tag-partial  { background:#ffd06b10; color:var(--partial); border-color:#ffd06b30; }
-.tag-fail     { background:#ff6b6b10; color:var(--fail);    border-color:#ff6b6b30; }
+.tag-success { background: #6bffd410; color: var(--success); border-color: #6bffd430; }
+.tag-partial  { background: #ffd06b10; color: var(--partial); border-color: #ffd06b30; }
+.tag-fail     { background: #ff6b6b10; color: var(--fail);    border-color: #ff6b6b30; }
 
 /* TYPE CARD */
 .type-card {
@@ -61,9 +133,9 @@
   user-select: none;
 }
 .type-card-header:hover { background: var(--surface2); }
-.type-card-title { font-family:var(--display); font-size:15px; font-weight:700; }
-.type-card-meta { font-size:12px; color:var(--muted); margin-top:2px; }
-.type-card-right { display:flex; align-items:center; gap:12px; }
+.type-card-title { font-family: var(--display); font-size: 15px; font-weight: 700; }
+.type-card-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.type-card-right { display: flex; align-items: center; gap: 12px; }
 .type-card-body {
   padding: 0 20px;
   max-height: 0;
@@ -71,12 +143,8 @@
   transition: max-height .35s ease, padding .35s;
 }
 .type-card-body.open { max-height: 2000px; padding: 0 20px 20px; }
-.expand-icon { font-size:12px; color:var(--muted); transition:transform .3s; }
-.type-card-header.open .expand-icon { transform:rotate(180deg); }
-
-/* TYPE HEATMAP ROW */
-.type-heatmap-row { margin-bottom:16px; }
-.type-heatmap-label { font-family:var(--mono); font-size:10px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+.expand-icon { font-size: 12px; color: var(--muted); transition: transform .3s; }
+.type-card-header.open .expand-icon { transform: rotate(180deg); }
 
 /* TASK ROWS inside type */
 .task-row {
@@ -86,14 +154,38 @@
   padding: 12px 14px;
   margin-bottom: 8px;
 }
-.task-row-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.task-row-name { font-family:var(--display); font-size:13px; font-weight:700; }
-.task-row-meta { font-size:11px; color:var(--muted); margin-bottom:6px; }
+.task-row-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.task-row-name   { font-family: var(--display); font-size: 13px; font-weight: 700; }
+.task-row-meta   { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+
+/* INACTIVE BADGE */
+.inactive-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: #ff6b6b10;
+  color: var(--fail);
+  border: 1px solid #ff6b6b30;
+  margin-left: 6px;
+}
+
+/* DAY LABELS ROW */
+.heatmap-with-labels { display: flex; flex-direction: column; gap: 4px; }
+.heatmap-day-labels  { display: flex; gap: 4px; }
+.heatmap-day-label   {
+  width: 20px; height: 12px;
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 12px;
+}
 
 /* LEGEND */
-.legend { display:flex; gap:16px; margin-bottom:20px; }
-.legend-item { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; color:var(--muted); }
-.legend-dot { width:10px; height:10px; border-radius:3px; }
+.legend { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.legend-dot  { width: 10px; height: 10px; border-radius: 3px; }
 {% endblock %}
 
 {% block content %}
@@ -103,9 +195,17 @@
 </div>
 
 <div class="report-controls">
-  <button class="period-btn active" id="pbtn-weekly"  onclick="setPeriod('weekly')">Weekly (7d)</button>
-  <button class="period-btn"        id="pbtn-monthly" onclick="setPeriod('monthly')">Monthly (30d)</button>
+  <button class="period-btn active" id="pbtn-weekly"  onclick="setPeriod('weekly')">Weekly</button>
+  <button class="period-btn"        id="pbtn-monthly" onclick="setPeriod('monthly')">Monthly</button>
   <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="loadReport()">↻ Refresh</button>
+</div>
+
+<!-- Navigation row -->
+<div class="nav-row">
+  <div class="nav-arrow" id="nav-prev" onclick="shiftOffset(-1)">←</div>
+  <div class="nav-label" id="nav-label">Loading…</div>
+  <div class="nav-arrow" id="nav-next" onclick="shiftOffset(1)">→</div>
+  <button class="nav-today-btn" id="nav-today" onclick="goToToday()">Today</button>
 </div>
 
 <div class="legend">
@@ -119,31 +219,98 @@
 
 {% block extra_script %}
 let reportPeriod = 'weekly';
+let reportOffset = 0;
+let boundsCache  = null;  // { min_week_offset, max_week_offset, min_month_offset, max_month_offset }
+
+// ── PERIOD / NAVIGATION ──────────────────────────────────────────────────────
 
 function setPeriod(p) {
   reportPeriod = p;
+  reportOffset = 0;
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pbtn-' + p).classList.add('active');
   loadReport();
 }
 
+function shiftOffset(delta) {
+  const minOff = reportPeriod === 'weekly' ? boundsCache.min_week_offset  : boundsCache.min_month_offset;
+  const maxOff = reportPeriod === 'weekly' ? boundsCache.max_week_offset   : boundsCache.max_month_offset;
+  const next = reportOffset + delta;
+  if (next < minOff || next > maxOff) return;
+  reportOffset = next;
+  loadReport();
+}
+
+function goToToday() {
+  reportOffset = 0;
+  loadReport();
+}
+
+async function fetchBounds() {
+  const r = await fetch('/api/report/bounds');
+  boundsCache = await r.json();
+}
+
+function updateNavUI(data) {
+  if (!boundsCache) return;
+  const minOff = reportPeriod === 'weekly' ? boundsCache.min_week_offset  : boundsCache.min_month_offset;
+  const maxOff = reportPeriod === 'weekly' ? boundsCache.max_week_offset   : boundsCache.max_month_offset;
+
+  document.getElementById('nav-label').textContent = data.label;
+
+  const prevBtn = document.getElementById('nav-prev');
+  const nextBtn = document.getElementById('nav-next');
+  const todayBtn = document.getElementById('nav-today');
+
+  prevBtn.classList.toggle('disabled', reportOffset <= minOff);
+  nextBtn.classList.toggle('disabled', reportOffset >= maxOff);
+  todayBtn.classList.toggle('hidden',  reportOffset === 0);
+}
+
 async function loadReport() {
   document.getElementById('report-root').innerHTML =
     `<div class="empty-state"><div class="empty-icon" style="animation:pulse 1s infinite">◈</div><div class="empty-text">Loading…</div></div>`;
-  const r    = await fetch('/api/report?period=' + reportPeriod);
+
+  if (!boundsCache) await fetchBounds();
+
+  const r    = await fetch(`/api/report?period=${reportPeriod}&offset=${reportOffset}`);
   const data = await r.json();
+
+  updateNavUI(data);
   renderReport(data);
 }
 
 // ── SHARED HELPERS ───────────────────────────────────────────────────────────
 
-function heatmap(dates, dayStatus) {
-  return dates.map(d => {
-    const res = dayStatus[d] || 'fail';
+const DAY_LETTERS = ['S','M','T','W','T','F','S'];
+
+function heatmapWithLabels(dates, dayStatus) {
+  // Build labels row (day-of-week letter for each date)
+  const labels = dates.map(d => {
+    const dow = new Date(d + 'T00:00:00').getDay(); // 0=Sun
+    return `<div class="heatmap-day-label">${DAY_LETTERS[dow]}</div>`;
+  }).join('');
+
+  const cells = dates.map(d => {
+    const res = dayStatus[d];
+    if (!res) {
+      // Date is in range but task wasn't active — render faint placeholder
+      return `<div class="heat-day" style="background:var(--surface2);border:1px solid var(--border);opacity:0.3" title="${d}: not tracked"></div>`;
+    }
     const dt  = new Date(d + 'T00:00:00');
     const lbl = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + ': ' + res;
     return `<div class="heat-day ${res}" title="${lbl}"></div>`;
   }).join('');
+
+  return `
+    <div class="heatmap-with-labels">
+      <div class="heatmap-day-labels">${labels}</div>
+      <div class="heatmap">${cells}</div>
+    </div>`;
+}
+
+function heatmap(dates, dayStatus) {
+  return heatmapWithLabels(dates, dayStatus);
 }
 
 function barChart(dates, dayStatus) {
@@ -152,7 +319,11 @@ function barChart(dates, dayStatus) {
   return `
     <div class="bar-chart">
       ${dates.map((d,i) => {
-        const res = dayStatus[d] || 'fail';
+        const res = dayStatus[d];
+        if (!res) {
+          // not tracked on this day
+          return `<div class="bar-col"><div class="bar" style="height:0%;background:transparent"></div><div class="bar-label" style="color:var(--border)">${dayLabels[i]}</div></div>`;
+        }
         const h   = res==='success'?100:res==='partial'?55:8;
         const col = res==='success'?'var(--success)':res==='partial'?'var(--partial)':'#ff6b6b44';
         return `<div class="bar-col"><div class="bar" style="height:${h}%;background:${col}"></div><div class="bar-label">${dayLabels[i]}</div></div>`;
@@ -167,7 +338,7 @@ function renderReport(data) {
   const dates = data.date_range;
 
   if (!data.task_stats.length) {
-    root.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">No tasks to report on yet.</div></div>`;
+    root.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div><div class="empty-text">No tasks to report on for this period.</div></div>`;
     return;
   }
 
@@ -220,7 +391,7 @@ function renderOverall(data, dates) {
 
     <div class="card">
       <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Day-by-day overview</div>
-      <div class="heatmap" style="margin-bottom:12px">${heatmap(dates, ov.day_status)}</div>
+      <div style="margin-bottom:12px">${heatmap(dates, ov.day_status)}</div>
       ${dates.length > 1 ? barChart(dates, ov.day_status) : ''}
     </div>
   `;
@@ -254,7 +425,7 @@ function renderTypeSummary(data, dates) {
         <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:12px">
           <div style="height:100%;width:${t.avg_pct}%;background:${col};border-radius:4px;transition:width .6s"></div>
         </div>
-        <div class="heatmap">${heatmap(dates, t.day_status)}</div>
+        ${heatmap(dates, t.day_status)}
       </div>
     `;
   }).join('');
@@ -278,7 +449,8 @@ function renderTaskWise(data, dates) {
   const cards = entries.map((typeData, idx) => {
     const tasks = [...typeData.tasks].sort((a,b) => b.success_pct - a.success_pct);
     const taskRows = tasks.map(s => {
-      const pc  = pctClass(s.success_pct);
+      const pc = pctClass(s.success_pct);
+      const isInactive = s.is_active === '0';
       return `
         <div class="task-row">
           <div class="task-row-header">
@@ -286,14 +458,16 @@ function renderTaskWise(data, dates) {
               <div class="task-row-name">
                 ${esc(s.name)}${s.subtask?` <span style="color:var(--muted);font-weight:400;font-size:11px">/ ${esc(s.subtask)}</span>`:''}
                 <span class="freq-badge">${s.frequency}×/day</span>
+                ${isInactive ? `<span class="inactive-badge">archived</span>` : ''}
               </div>
             </div>
             <span class="pct-badge ${pc}">${s.success_pct}%</span>
           </div>
           <div class="task-row-meta">
             ✓ ${s.success_days}d · ◑ ${s.partial_days}d · ✕ ${s.fail_days}d missed
+            · tracked ${s.active_days}d
           </div>
-          <div class="heatmap">${heatmap(dates, s.daily_results)}</div>
+          ${heatmap(dates, s.daily_results)}
           ${dates.length > 1 ? barChart(dates, s.daily_results) : ''}
         </div>
       `;

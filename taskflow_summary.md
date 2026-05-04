@@ -1,86 +1,63 @@
 # TaskFlow — Project Summary
 
-> A local desktop task tracker built with Python + Flask, running in the browser, storing data in CSV files.
+> A local desktop habit and task tracker built with Python + Flask, running in the browser, storing data in CSV files. No cloud, no accounts — just run and go.
 
 ---
 
 ## Project Idea
 
-The goal was to build a **simple, local-first desktop app** for personal habit and task tracking — no cloud, no accounts, no heavy backend. Just run a Python script and it opens in your browser.
+Build a simple, local-first app for personal habit tracking. The core idea: define tasks once, then every day check them off. Reports show how consistent you've been over time.
 
-### Core requirements defined during planning:
+### Core requirements
 
 - **Task management** — Add tasks grouped by type/category (e.g. Physical, Mental, Work), with optional sub-tasks, descriptions, and a daily frequency (how many times per day)
-- **Daily tracker** — Multiple checkboxes per task matching the required frequency (e.g. 2×/day = 2 checkboxes). A task counts as a full success only when all checkboxes are checked
-- **Reports** — Weekly and monthly views showing success rates, missed tasks, heatmaps, and bar charts
+- **Daily tracker** — Multiple checkboxes per task matching the required frequency (e.g. 2×/day = 2 checkboxes). A task counts as full success only when every checkbox is checked
+- **Reports** — Weekly and monthly views with proper calendar weeks, prev/next navigation, success rates, heatmaps, and bar charts
 
-### Key design decisions:
+### Key design decisions
 
 | Decision | Choice | Reason |
 |---|---|---|
-| Tech stack | Python + Flask + Browser | Most interactive, fastest startup, no Electron overhead |
-| Completion tracking | Multiple checkboxes per frequency | Clearest UX — each repetition is a distinct checkbox |
-| Success definition | All checkboxes checked = success | Each repetition treated as a separate task |
+| Tech stack | Python + Flask + Browser | Interactive, fast startup, no Electron overhead |
+| Completion tracking | Multiple checkboxes per frequency | Each repetition is a distinct checkbox — clearest UX |
+| Success definition | All checkboxes checked = success | Each repetition treated as a separate obligation |
 | Data storage | Plain CSV files | Simple, portable, openable in Excel |
+| Week definition | Sunday–Saturday | Standard calendar week |
 
 ---
 
-## What Was Built
+## Current Version — v3
 
-### Version 1 — Single file app
+### Directory Structure
 
-Initial build as a single `index.html` template with everything in one file.
-
-**Files:**
 ```
-tasktracker/
-├── run.py           ← launcher (auto-opens browser)
-├── app.py           ← Flask backend + all API routes
-├── tasks.csv        ← auto-created on first run
-├── logs.csv         ← auto-created on first run
+TaskFlow/
+├── run.py                  ← Launcher: starts Flask and auto-opens browser
+├── app.py                  ← Flask backend: all routes, API, CSV logic
+├── tasks.csv               ← Auto-created on first run — task definitions
+├── logs.csv                ← Auto-created on first run — daily check-in history
+├── taskflow_summary.md     ← This file
+├── FUTURE_WORK.md          ← Planned features with implementation notes
+├── README.md               ← GitHub readme / setup guide
 └── templates/
-    └── index.html   ← entire frontend (HTML + CSS + JS)
+    ├── index.html          ← Base layout: shell, nav, shared CSS, shared JS
+    ├── manage.html         ← Manage Tasks page
+    ├── tracker.html        ← Daily Tracker page
+    └── report.html         ← Reports page
 ```
 
-**Features built:**
-- Add tasks with Type, Name, Sub-task, Description, Times/Day
-- Tasks auto-grouped by type in the UI
-- Daily tracker with per-task checkboxes and live progress bar
-- Navigate to previous days via Prev/Next buttons
-- Weekly and monthly report with heatmap + bar chart per task
+### File Purposes
 
----
-
-### Version 2 — Split into multiple pages + enhanced reports
-
-Refactored into proper multi-page Flask app using Jinja2 template inheritance. `index.html` became the base layout; each page extends it.
-
-**Files:**
-```
-tasktracker/
-├── run.py
-├── app.py
-├── tasks.csv
-├── logs.csv
-└── templates/
-    ├── index.html    ← base layout: nav, shared CSS, shared JS
-    ├── manage.html   ← Manage Tasks page
-    ├── tracker.html  ← Daily Tracker page
-    └── report.html   ← Reports page
-```
-
-**What changed:**
-- Each page is now a separate route (`/manage`, `/tracker`, `/report`)
-- Active nav link highlights automatically via Jinja2 `active` variable
-- Shared styles, toast notifications, and utility functions defined once in `index.html`
-
-**New report features added:**
-
-| Section | What it shows |
+| File | Purpose |
 |---|---|
-| **Overall** | Single % score across all tasks, perfect/partial/missed day count, best & worst task callout, full heatmap + bar chart |
-| **By Category** | Per-type aggregated %, heatmap where success = *all* tasks in that type succeeded that day |
-| **Task Breakdown** | Collapsible cards per category, each task showing its own heatmap and bar chart |
+| `run.py` | Entry point. Starts Flask on port 5050 and opens the browser after 0.8s |
+| `app.py` | All backend logic: Flask routes, REST API, CSV read/write, report calculations, DB migration |
+| `tasks.csv` | One row per task. Schema: `id, type, name, subtask, description, frequency, parent_id, created_on, is_active, removed_on` |
+| `logs.csv` | One row per checkbox per day. Schema: `date, task_id, occurrence, done` |
+| `templates/index.html` | Jinja2 base template. Defines the shell (topbar + sidebar + main), all CSS variables, shared utility JS (toast, esc, pctClass) |
+| `templates/manage.html` | Add and delete tasks. Fetches tasks via API, groups by type, renders form |
+| `templates/tracker.html` | Daily check-in view. Date navigation, checkboxes per task, live progress bar |
+| `templates/report.html` | Reports view. Period toggle, week/month navigation with prev/next, all three report sections |
 
 ---
 
@@ -88,65 +65,93 @@ tasktracker/
 
 ### Backend (`app.py`)
 
-- **Flask** serves 4 routes: `/`, `/manage`, `/tracker`, `/report`
-- **REST API** over JSON for all data operations:
-  - `GET /api/tasks` — list all tasks
-  - `POST /api/tasks` — add a task
-  - `DELETE /api/tasks/<id>` — remove a task and its logs
-  - `GET /api/logs?date=YYYY-MM-DD` — get checkboxes for a day
-  - `POST /api/logs` — save a checkbox state
-  - `GET /api/report?period=weekly|monthly` — get full report data
+Flask serves 4 page routes and a REST API over JSON.
 
-### Data (`tasks.csv` + `logs.csv`)
+**Page routes:**
+- `GET /` → `index.html` (redirects to tracker in practice)
+- `GET /manage` → `manage.html`
+- `GET /tracker` → `tracker.html`
+- `GET /report` → `report.html`
 
-**tasks.csv** — one row per task:
-```
-id, type, name, subtask, description, frequency, parent_id
-```
+**API routes:**
 
-**logs.csv** — one row per checkbox per day:
-```
-date, task_id, occurrence, done
-```
-`occurrence` is the repetition number (1, 2, 3…) for tasks with frequency > 1.
+| Method | Endpoint | What it does |
+|---|---|---|
+| GET | `/api/tasks` | List all tasks (including archived) |
+| POST | `/api/tasks` | Add a new task |
+| DELETE | `/api/tasks/<id>` | Hard delete task + all its logs |
+| GET | `/api/logs?date=YYYY-MM-DD` | Get all checkbox states for a day |
+| POST | `/api/logs` | Save/update one checkbox state |
+| GET | `/api/report?period=weekly\|monthly&offset=N` | Full report data for a period |
+| GET | `/api/report/bounds` | Min/max offsets the user can navigate to |
+
+**Startup:** `ensure_files()` creates CSVs if missing. `migrate_tasks()` automatically adds new columns to an existing `tasks.csv` without data loss.
+
+### Data Schema
+
+**`tasks.csv`** — one row per task:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | int | Auto-incremented |
+| `type` | string | Category label (e.g. "Physical") |
+| `name` | string | Task name |
+| `subtask` | string | Optional sub-task label |
+| `description` | string | Optional detail/note |
+| `frequency` | int | How many times per day (default 1) |
+| `parent_id` | int | ID of parent task if this is a sub-task |
+| `created_on` | YYYY-MM-DD | Date task was added — used for report date clamping |
+| `is_active` | 0 or 1 | 1 = active in daily tracker, 0 = archived (UI coming) |
+| `removed_on` | YYYY-MM-DD | Date archived, empty if still active |
+
+**`logs.csv`** — one row per checkbox per day:
+
+| Column | Type | Notes |
+|---|---|---|
+| `date` | YYYY-MM-DD | The day being logged |
+| `task_id` | int | References `tasks.csv` id |
+| `occurrence` | int | Which repetition (1, 2, 3… up to `frequency`) |
+| `done` | 0 or 1 | Whether that checkbox was checked |
 
 ### Frontend
 
-- Pure HTML + CSS + JavaScript (no frameworks)
-- Jinja2 template inheritance — base layout in `index.html`, pages extend with `{% block content %}`
-- All data fetched from the API via `fetch()` on page load
-- Live UI updates on checkbox toggle without full page reload
+- Pure HTML + CSS + JavaScript — no frameworks
+- Jinja2 template inheritance: `index.html` is the base, all pages use `{% extends "index.html" %}` and fill `{% block content %}` and `{% block extra_script %}`
+- All data fetched from API via `fetch()` on page load
+- Live checkbox updates without full page reload
 
-### Report logic
+### Report Logic
 
-- **Success** for a task on a day = all `frequency` occurrences marked done
-- **Partial** = at least one, but not all, occurrences done
-- **Fail** = zero occurrences done
-- **Type-level success** = all tasks in that type succeeded that day
-- **Overall success** = all tasks across all types succeeded that day
+**Per task, per day:**
+- **Success** = all `frequency` occurrences marked done
+- **Partial** = at least one but not all done
+- **Fail** = zero done
 
----
+**Date clamping:** A task is only evaluated from its `created_on` date onward (and up to `removed_on` if archived). Pre-creation days show as faint grey cells in heatmaps and are excluded from all percentage calculations.
 
-## How to Run
+**Type-level success** = all tasks in that type succeeded that day (only counting tasks active on that day).
 
-```bash
-# 1. Install dependency (one time)
-pip install flask
+**Overall success** = all active tasks across all types succeeded that day.
 
-# 2. Start the app
-cd C:\Projects\TaskTracker
-python run.py
-
-# App opens automatically at http://localhost:5050
-# Press Ctrl+C to stop
-```
+**Week definition:** Sunday–Saturday. The `/api/report/bounds` endpoint calculates how far back the user can navigate by finding the earliest `created_on` or log date.
 
 ---
 
-## Future Ideas
+## Version History
 
-- Export report as PDF or CSV
-- Streak tracking (consecutive successful days)
-- Notifications / reminders
-- Task archiving instead of hard delete
-- Color coding per category
+### v1 — Single file app
+Initial build. Everything in one `index.html`. Single Flask file. Basic task add/delete, daily tracker with checkboxes, simple weekly/monthly report.
+
+### v2 — Multi-page + enhanced reports
+Refactored into proper Jinja2 template inheritance. Split into `manage.html`, `tracker.html`, `report.html`. Added collapsible type cards in reports, per-task heatmaps, bar charts, Overall / By Category / Task Breakdown sections.
+
+### v3 — Calendar weeks + navigation (current)
+- Weeks now run Sunday–Saturday instead of rolling 7-day windows
+- Prev/Next navigation to browse past weeks and months
+- Navigation disabled beyond the earliest date with actual data
+- `tasks.csv` schema extended: `created_on`, `is_active`, `removed_on`
+- Auto-migration: existing CSVs are upgraded on startup without data loss
+- Heatmaps show day-of-week labels (S M T W T F S)
+- Pre-creation days render as grey cells, excluded from all calculations
+- Archived tasks will appear in historical reports with an "archived" badge
+- New API endpoint: `GET /api/report/bounds`

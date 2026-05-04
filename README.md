@@ -1,42 +1,114 @@
-# TaskFlow — Daily Progress Tracker
+# TaskFlow
 
-A minimal local desktop app to track your daily habits and tasks. Runs in your browser, stores everything in CSV files on your machine. No cloud, no accounts.
+A minimal local desktop app for tracking daily habits and tasks. Runs in your browser, stores everything in plain CSV files on your machine.
+
+**No cloud. No accounts. No background services.** Just run one Python script and it opens in your browser.
+
+---
+
+## What it does
+
+**Manage Tasks** — Define tasks by category (Physical, Mental, Work, etc.), set how many times a day each must be done, and optionally add sub-tasks and descriptions.
+
+**Daily Tracker** — Every day, check off each task as you do it. Tasks with a frequency of 2×/day show two checkboxes. A live progress bar shows how your day is going.
+
+**Reports** — See your consistency over any past week or month. Navigate back in time with Prev/Next. Three views: overall score, per-category breakdown, and per-task heatmaps + bar charts.
+
+---
 
 ## Setup
 
-1. Make sure you have **Python 3.8+** installed
-2. Install Flask once:
-   ```
-   pip install flask
-   ```
-3. Run the app:
-   ```
-   python run.py
-   ```
-   It will open automatically at `http://localhost:5050`
+**Requirements:** Python 3.8+
+
+```bash
+# 1. Clone or download the project
+git clone https://github.com/yourusername/taskflow.git
+cd taskflow
+
+# 2. Install the one dependency
+pip install flask
+
+# 3. Run
+python run.py
+```
+
+The app opens automatically at `http://localhost:5050`. Press `Ctrl+C` in the terminal to stop it.
+
+The two data files (`tasks.csv` and `logs.csv`) are created automatically on first run in the same folder.
+
+---
 
 ## How to use
 
 ### Manage Tasks
-- Set a **Type** (e.g. Physical, Mental, Work)
-- Add a **Task Name** and optional **Sub-task**
-- Add a **Description** (e.g. "Run 20 mins")
-- Set **Times/Day** — how many times per day you must do it (e.g. 2 = two checkboxes in tracker)
+- Go to **Manage Tasks** in the sidebar
+- Fill in: Type, Task Name, and Times/Day (minimum fields)
+- Optionally add a Sub-task label and Description
+- Tasks are grouped by Type automatically
+- Delete removes the task and all its history permanently
 
 ### Daily Tracker
-- Navigate by date using Prev/Next
-- Each task shows one checkbox per required repetition
-- Progress bar fills as you check them off
-- Green = fully done, Yellow = partial
+- Go to **Daily Tracker** — it defaults to today
+- Use ← Prev / Next → to navigate to other days
+- Check off each box as you complete each repetition
+- A task is fully done when all its boxes are checked (green = done, yellow = partial)
 
 ### Reports
-- Toggle between **Weekly** (7 days) and **Monthly** (30 days)
-- Heatmap shows day-by-day: green=success, yellow=partial, red=missed
-- Bar chart shows your consistency over time
-- Stats show your overall %, best task, and task needing most work
+- Go to **Reports**
+- Toggle between **Weekly** (Sun–Sat) and **Monthly**
+- Use ← Prev / Next → to browse past periods
+- Navigation is disabled for periods before your first task was created
+- Three sections:
+  - **Overall** — single % score, perfect/partial/missed day counts, best and worst task
+  - **By Category** — per-type % and heatmap
+  - **Task Breakdown** — collapsible cards with per-task heatmap and bar chart
 
-## Data Files
-- `tasks.csv` — your task definitions
-- `logs.csv` — your daily check-in history
+---
 
-Both are plain CSV files you can open in Excel or Google Sheets.
+## Data files
+
+Both files are plain CSV — open them in Excel or Google Sheets anytime.
+
+**`tasks.csv`** — your task definitions:
+```
+id, type, name, subtask, description, frequency, parent_id, created_on, is_active, removed_on
+```
+
+**`logs.csv`** — your daily check-in history:
+```
+date, task_id, occurrence, done
+```
+
+`occurrence` is the repetition number (1, 2, 3…) for tasks with frequency > 1.
+
+---
+
+## Project structure
+
+```
+TaskFlow/
+├── run.py              ← Start here
+├── app.py              ← Flask backend + all API routes
+├── tasks.csv           ← Auto-created — task definitions
+├── logs.csv            ← Auto-created — daily history
+└── templates/
+    ├── index.html      ← Base layout (nav, shared styles + JS)
+    ├── manage.html     ← Manage Tasks page
+    ├── tracker.html    ← Daily Tracker page
+    └── report.html     ← Reports page
+```
+
+---
+
+## Tech stack
+
+- **Python + Flask** — backend and API
+- **Jinja2** — templating
+- **Vanilla HTML / CSS / JS** — frontend, no frameworks
+- **CSV files** — data storage
+
+---
+
+## Migrating from an older version
+
+If you have an existing `tasks.csv` from a previous version, the app will automatically add any missing columns (`created_on`, `is_active`, `removed_on`) on startup. No manual steps needed, your existing data is preserved.
