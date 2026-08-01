@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""TaskFlow — run this to start the app."""
-import os, sys, subprocess
+"""TaskFlow — run this to start the app locally."""
+import os
+import subprocess
+import sys
+import threading
+import webbrowser
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    import flask
+    import flask  # noqa: F401
 except ImportError:
-    print("Installing Flask...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "flask"])
+    print("Installing dependencies...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 
-from app import app, ensure_files
-import webbrowser, threading
+from app import app
 
-ensure_files()
 print("\n✦ TaskFlow running at http://localhost:5050")
 print("  Press Ctrl+C to stop.\n")
 threading.Timer(0.8, lambda: webbrowser.open("http://localhost:5050")).start()

@@ -1,8 +1,6 @@
 # TaskFlow
 
-A minimal local desktop app for tracking daily habits and tasks. Runs in your browser, stores everything in plain CSV files on your machine.
-
-**No cloud. No accounts. No background services.** Just run one Python script and it opens in your browser.
+A multi-user habit and task tracker. Each person gets their own account and their own private set of tasks/logs. Runs in the browser, backed by Postgres, deployable for free.
 
 ---
 
@@ -14,31 +12,78 @@ A minimal local desktop app for tracking daily habits and tasks. Runs in your br
 
 **Reports** — See your consistency over any past week or month. Navigate back in time with Prev/Next. Three views: overall score, per-category breakdown, and per-task heatmaps + bar charts.
 
+**Accounts** — Register with an email + password. All tasks and logs are scoped to your account, so multiple people can share one deployment without seeing each other's data.
+
 ---
 
-## Setup
+## Tech stack
 
-**Requirements:** Python 3.8+
+- **Python + Flask** — backend and API
+- **SQLAlchemy + Flask-Migrate** — ORM and schema migrations
+- **PostgreSQL** (hosted on [Supabase](https://supabase.com), free tier) — data storage
+- **Flask-Login + Werkzeug** — authentication and password hashing
+- **Jinja2** — templating
+- **Vanilla HTML / CSS / JS** — frontend, no frameworks
+- **Docker + gunicorn** — containerized production server
+- **Render** — hosting, auto-deploys on push to `main`
+
+---
+
+## Local development
+
+**Requirements:** Python 3.10+, a Postgres database (e.g. a free [Supabase](https://supabase.com) project)
 
 ```bash
-# 1. Clone or download the project
-git clone https://github.com/yourusername/taskflow.git
-cd taskflow
+# 1. Clone the project
+git clone https://github.com/Aarsh-J/TaskFlow.git
+cd TaskFlow
 
-# 2. Install the one dependency
-pip install flask
+# 2. Install dependencies
+pip install -r requirements.txt
 
-# 3. Run
+# 3. Configure environment
+# Create a .env file with:
+#   DATABASE_URL="postgresql://..."
+#   SECRET_KEY="<random secret>"
+
+# 4. Apply database migrations
+export FLASK_APP=app.py   # (Windows: set FLASK_APP=app.py)
+flask db upgrade
+
+# 5. Run
 python run.py
 ```
 
-The app opens automatically at `http://localhost:5050`. Press `Ctrl+C` in the terminal to stop it.
+The app opens automatically at `http://localhost:5050`. Register an account, then log in.
 
-The two data files (`tasks.csv` and `logs.csv`) are created automatically on first run in the same folder.
+---
+
+## Running with Docker
+
+```bash
+docker build -t taskflow .
+docker run -p 8080:8080 -e DATABASE_URL="postgresql://..." -e SECRET_KEY="..." taskflow
+```
+
+The container runs pending migrations automatically on startup before serving requests.
+
+---
+
+## Deployment
+
+Deployed on [Render](https://render.com) as a Docker-based web service, connected to this GitHub repo — every push to `main` triggers an automatic rebuild and redeploy. The database is a free Postgres instance on Supabase (Mumbai region, for low latency).
+
+Required environment variables on the host:
+- `DATABASE_URL` — Supabase Postgres connection string
+- `SECRET_KEY` — random string used to sign session cookies
 
 ---
 
 ## How to use
+
+### Register / Log In
+- First visit redirects to `/login`; use the link there to `/register` a new account
+- Each account's tasks and logs are completely private to that account
 
 ### Manage Tasks
 - Go to **Manage Tasks** in the sidebar
@@ -65,50 +110,21 @@ The two data files (`tasks.csv` and `logs.csv`) are created automatically on fir
 
 ---
 
-## Data files
-
-Both files are plain CSV — open them in Excel or Google Sheets anytime.
-
-**`tasks.csv`** — your task definitions:
-```
-id, type, name, subtask, description, frequency, parent_id, created_on, is_active, removed_on
-```
-
-**`logs.csv`** — your daily check-in history:
-```
-date, task_id, occurrence, done
-```
-
-`occurrence` is the repetition number (1, 2, 3…) for tasks with frequency > 1.
-
----
-
 ## Project structure
 
 ```
 TaskFlow/
-├── run.py              ← Start here
-├── app.py              ← Flask backend + all API routes
-├── tasks.csv           ← Auto-created — task definitions
-├── logs.csv            ← Auto-created — daily history
+├── run.py              ← Local dev entrypoint
+├── app.py              ← Flask app + all API routes
+├── auth.py             ← Register/login/logout routes
+├── models.py            ← SQLAlchemy models (User, Task, Log)
+├── migrations/          ← Alembic schema migrations
+├── Dockerfile           ← Production container image
 └── templates/
     ├── index.html      ← Base layout (nav, shared styles + JS)
-    ├── manage.html     ← Manage Tasks page
-    ├── tracker.html    ← Daily Tracker page
-    └── report.html     ← Reports page
+    ├── login.html       ← Login page
+    ├── register.html    ← Registration page
+    ├── manage.html      ← Manage Tasks page
+    ├── tracker.html     ← Daily Tracker page
+    └── report.html      ← Reports page
 ```
-
----
-
-## Tech stack
-
-- **Python + Flask** — backend and API
-- **Jinja2** — templating
-- **Vanilla HTML / CSS / JS** — frontend, no frameworks
-- **CSV files** — data storage
-
----
-
-## Migrating from an older version
-
-If you have an existing `tasks.csv` from a previous version, the app will automatically add any missing columns (`created_on`, `is_active`, `removed_on`) on startup. No manual steps needed, your existing data is preserved.
