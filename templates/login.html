@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TaskFlow — Log In</title>
+<title>Hatchabit — Log In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -52,6 +52,13 @@
     margin-bottom: 24px;
   }
   .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+  .tagline {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    margin-top: -14px;
+    margin-bottom: 24px;
+  }
   label {
     display: block;
     font-family: var(--mono);
@@ -104,7 +111,8 @@
 </head>
 <body>
   <div class="auth-card">
-    <div class="logo"><div class="logo-dot"></div>TaskFlow</div>
+    <div class="logo"><div class="logo-dot"></div>Hatchabit</div>
+    <p class="tagline">Build habits that stick, and watch your progress take shape — day by day, streak by streak.</p>
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
     <form method="POST">
       <div class="form-row">

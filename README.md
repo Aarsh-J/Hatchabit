@@ -1,4 +1,4 @@
-# TaskFlow
+# Hatchabit
 
 A multi-user habit and task tracker. Each person gets their own account and their own private set of tasks/logs. Runs in the browser, backed by Postgres, deployable for free.
 
@@ -35,8 +35,8 @@ A multi-user habit and task tracker. Each person gets their own account and thei
 
 ```bash
 # 1. Clone the project
-git clone https://github.com/Aarsh-J/TaskFlow.git
-cd TaskFlow
+git clone https://github.com/Aarsh-J/Hatchabit.git
+cd Hatchabit
 
 # 2. Install dependencies
 pip install -r requirements.txt
@@ -61,8 +61,8 @@ The app opens automatically at `http://localhost:5050`. Register an account, the
 ## Running with Docker
 
 ```bash
-docker build -t taskflow .
-docker run -p 8080:8080 -e DATABASE_URL="postgresql://..." -e SECRET_KEY="..." taskflow
+docker build -t hatchabit .
+docker run -p 8080:8080 -e DATABASE_URL="postgresql://..." -e SECRET_KEY="..." hatchabit
 ```
 
 The container runs pending migrations automatically on startup before serving requests.
@@ -113,7 +113,7 @@ Required environment variables on the host:
 ## Project structure
 
 ```
-TaskFlow/
+Hatchabit/
 ├── run.py              ← Local dev entrypoint
 ├── app.py              ← Flask app + all API routes
 ├── auth.py             ← Register/login/logout routes

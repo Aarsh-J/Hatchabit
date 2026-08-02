@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 
@@ -37,7 +37,7 @@ app.register_blueprint(auth_bp)
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
+    return redirect(url_for("tracker"))
 
 @app.route("/manage")
 @login_required

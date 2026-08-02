@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TaskFlow — run this to start the app locally."""
+"""Hatchabit — run this to start the app locally."""
 import os
 import subprocess
 import sys
@@ -16,7 +16,7 @@ except ImportError:
 
 from app import app
 
-print("\n✦ TaskFlow running at http://localhost:5050")
+print("\n✦ Hatchabit running at http://localhost:5050")
 print("  Press Ctrl+C to stop.\n")
 threading.Timer(0.8, lambda: webbrowser.open("http://localhost:5050")).start()
 app.run(port=5050, debug=False)
