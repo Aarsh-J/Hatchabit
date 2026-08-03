@@ -265,13 +265,16 @@
   <nav class="sidebar">
     <div class="nav-section">Menu</div>
     <a class="nav-btn {% if active=='manage' %}active{% endif %}" href="/manage">
-      <span class="nav-icon">⊞</span> Manage Tasks
+      <span class="nav-icon">⊞</span> Manage Habits
     </a>
     <a class="nav-btn {% if active=='tracker' %}active{% endif %}" href="/tracker">
       <span class="nav-icon">◎</span> Daily Tracker
     </a>
     <a class="nav-btn {% if active=='report' %}active{% endif %}" href="/report">
       <span class="nav-icon">◈</span> Reports
+    </a>
+    <a class="nav-btn {% if active=='todo' %}active{% endif %}" href="/todo">
+      <span class="nav-icon">☑</span> To-do
     </a>
     <div style="margin-top:auto;">
       <div class="nav-section">{{ current_user.email }}</div>
@@ -312,6 +315,12 @@
 
   // Shared pct class helper
   function pctClass(p) { return p >= 70 ? 'pct-high' : p >= 40 ? 'pct-mid' : 'pct-low'; }
+
+  // Shared frequency label, e.g. "3×/week"
+  function freqLabel(entity) {
+    const unit = entity.unit || 'day';
+    return `${entity.frequency}×/${unit}`;
+  }
 
   {% block extra_script %}{% endblock %}
 </script>

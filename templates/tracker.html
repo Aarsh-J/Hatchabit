@@ -26,7 +26,7 @@
 }
 .tracker-task.all-done { border-color: #6bffd430; }
 .tracker-task-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-.tracker-task-name { font-family:var(--display); font-size:13px; font-weight:700; }
+.tracker-task-name { font-family:var(--display); font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .checkboxes { display:flex; gap:10px; flex-wrap:wrap; }
 .check-item { display:flex; align-items:center; gap:7px; cursor:pointer; }
 .check-item input[type="checkbox"] {
@@ -49,6 +49,12 @@
 .check-label { font-family:var(--mono); font-size:11px; color:var(--muted); }
 .tracker-progress { height:3px; background:var(--surface2); border-radius:2px; margin-top:10px; overflow:hidden; }
 .tracker-progress-fill { height:100%; border-radius:2px; transition:width .3s ease, background .3s; }
+
+.subtask-list { margin-left: 4px; padding-left: 14px; border-left: 2px solid var(--border); display:flex; flex-direction:column; gap:12px; }
+.tracker-subtask-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.tracker-subtask-name { font-family:var(--display); font-size:12px; font-weight:700; }
+
+.streak-badge { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; background:#ff8a6b15; color:#ff8a6b; border:1px solid #ff8a6b30; }
 
 /* Daily summary bar */
 .day-summary {
@@ -98,13 +104,20 @@
 {% endblock %}
 
 {% block extra_script %}
+let habits = [];
 let tasks = [];
 let logs  = [];
+let periodProgress = {tasks:{}, subtasks:{}};
+let streaks = {tasks:{}, subtasks:{}, overall:{current:0,best:0}};
 let currentDate = new Date();
 
 async function init() {
-  const r = await fetch('/api/tasks');
-  tasks = await r.json();
+  const [hr, tr, sr] = await Promise.all([
+    fetch('/api/habits'), fetch('/api/tasks?active_only=true'), fetch('/api/streaks')
+  ]);
+  habits = await hr.json();
+  tasks = await tr.json();
+  streaks = await sr.json();
   await renderTracker();
 }
 
@@ -119,6 +132,11 @@ function changeDate(delta) {
   renderTracker();
 }
 
+function streakBadge(streak) {
+  if (!streak || !streak.current) return '';
+  return `<span class="streak-badge">🔥 ${streak.current}</span>`;
+}
+
 async function renderTracker() {
   const ds    = dateStr(currentDate);
   const today = dateStr(new Date());
@@ -131,107 +149,182 @@ async function renderTracker() {
   document.getElementById('btn-next').disabled = isToday;
   document.getElementById('btn-next').style.opacity = isToday ? '0.4' : '1';
 
-  const r = await fetch('/api/logs?date=' + ds);
-  logs = await r.json();
+  const [lr, pr] = await Promise.all([
+    fetch('/api/logs?date=' + ds),
+    fetch('/api/logs/period-progress?date=' + ds),
+  ]);
+  logs = await lr.json();
+  periodProgress = await pr.json();
 
   const container = document.getElementById('tracker-container');
   if (!tasks.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">No tasks yet. Add some in Manage Tasks first!</div></div>`;
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">No tasks yet. Add some in Manage Habits first!</div></div>`;
     updateDaySummary(0, 0);
     return;
   }
 
-  const groups = {};
-  tasks.forEach(t => { if (!groups[t.type]) groups[t.type]=[]; groups[t.type].push(t); });
-
-  container.innerHTML = Object.entries(groups).map(([type, items]) => `
+  container.innerHTML = habits.map(h => {
+    const items = tasks.filter(t => t.habit_id === h.id);
+    if (!items.length) return '';
+    return `
     <div class="tracker-group">
       <div class="type-header">
-        <span class="type-badge">${esc(type)}</span>
+        <span class="type-badge" style="background:${h.color}15;border-color:${h.color}40;color:${h.color}">${esc(h.name)}</span>
         <div class="type-line"></div>
       </div>
       ${items.map(t => renderTrackerTask(t, ds)).join('')}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
-  recalcDaySummary();
+  recalcDaySummary(ds);
+}
+
+function unitNoun(unit) { return unit === 'week' ? 'week' : unit === 'month' ? 'month' : 'day'; }
+
+// Builds the checkbox row + progress info for one entity (task or subtask) on date ds.
+// unit==='day': N numbered checkboxes, reset every day (unchanged behavior).
+// unit==='week'/'month': a single "done today" checkbox; progress is tracked
+// cumulatively across the whole period via periodProgress.
+function renderChecklist(entity, kind, ds) {
+  const unit = entity.unit || 'day';
+  const idOf = l => (kind === 'task' ? l.task_id : l.subtask_id);
+
+  if (unit === 'day') {
+    const freq = parseInt(entity.frequency);
+    const checks = Array.from({length: freq}, (_, i) => {
+      const log = logs.find(l => idOf(l) === entity.id && l.occurrence === String(i + 1));
+      return log && log.done === '1';
+    });
+    const doneCount = checks.filter(Boolean).length;
+    const pct = Math.round(doneCount / freq * 100);
+    const html = `
+      <div class="checkboxes">
+        ${Array.from({length: freq}, (_, i) => `
+          <label class="check-item">
+            <input type="checkbox" ${checks[i] ? 'checked' : ''} onchange="toggleCheck('${kind}','${entity.id}',${i + 1},this.checked,'${ds}')">
+            <span class="check-label">#${i + 1}</span>
+          </label>
+        `).join('')}
+      </div>`;
+    return { html, pct, countLabel: `${doneCount}/${freq}`, todayDone: doneCount, todayTotal: freq };
+  }
+
+  const todayLog = logs.find(l => idOf(l) === entity.id && l.occurrence === '1');
+  const checkedToday = !!(todayLog && todayLog.done === '1');
+  const bucket = kind === 'task' ? periodProgress.tasks : periodProgress.subtasks;
+  const prog = (bucket && bucket[entity.id]) || { done: 0, freq: entity.frequency };
+  const pct = Math.min(100, Math.round(prog.done / prog.freq * 100));
+  const html = `
+    <div class="checkboxes">
+      <label class="check-item">
+        <input type="checkbox" ${checkedToday ? 'checked' : ''} onchange="toggleCheck('${kind}','${entity.id}',1,this.checked,'${ds}')">
+        <span class="check-label">today</span>
+      </label>
+      <span class="check-label">${prog.done}/${prog.freq} this ${unitNoun(unit)}</span>
+    </div>`;
+  return { html, pct, countLabel: `${prog.done}/${prog.freq}`, todayDone: checkedToday ? 1 : 0, todayTotal: 1 };
 }
 
 function renderTrackerTask(t, ds) {
-  const freq   = parseInt(t.frequency);
-  const checks = Array.from({length:freq}, (_,i) => {
-    const log = logs.find(l => l.task_id===t.id && l.occurrence===String(i+1));
-    return log && log.done==='1';
-  });
-  const doneCount = checks.filter(Boolean).length;
-  const pct       = Math.round(doneCount / freq * 100);
-  const allDone   = doneCount === freq;
+  const streak = streaks.tasks[t.id] || {current:0,best:0};
+
+  if (t.subtasks.length) {
+    let totalOcc = 0, doneOcc = 0;
+    const subtaskHtml = t.subtasks.map(s => {
+      const c = renderChecklist(s, 'subtask', ds);
+      totalOcc += c.todayTotal; doneOcc += c.todayDone;
+      const sStreak = streaks.subtasks[s.id] || {current:0,best:0};
+      return `
+        <div id="tsub-${s.id}">
+          <div class="tracker-subtask-header">
+            <span class="tracker-subtask-name">${esc(s.name)} ${streakBadge(sStreak)}</span>
+            <span id="count-${s.id}" style="font-family:var(--mono);font-size:11px;color:${c.pct===100?'var(--success)':c.pct>0?'var(--partial)':'var(--muted)'}">${c.countLabel}</span>
+          </div>
+          ${c.html}
+        </div>
+      `;
+    }).join('');
+
+    const pct = totalOcc ? Math.round(doneOcc/totalOcc*100) : 0;
+    const allDone = totalOcc>0 && doneOcc===totalOcc;
+
+    return `
+      <div class="tracker-task${allDone?' all-done':''}" id="ttask-${t.id}">
+        <div class="tracker-task-header">
+          <div>
+            <div class="tracker-task-name">${esc(t.name)} ${streakBadge(streak)}</div>
+            ${t.description?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
+          </div>
+          <span id="taskcount-${t.id}" style="font-family:var(--mono);font-size:11px;color:${pct===100?'var(--success)':pct>0?'var(--partial)':'var(--muted)'}">${doneOcc}/${totalOcc}</span>
+        </div>
+        <div class="subtask-list">${subtaskHtml}</div>
+      </div>
+    `;
+  }
+
+  const c = renderChecklist(t, 'task', ds);
+  const allDone = c.pct === 100;
 
   return `
     <div class="tracker-task${allDone?' all-done':''}" id="ttask-${t.id}">
       <div class="tracker-task-header">
         <div>
-          <div class="tracker-task-name">
-            ${esc(t.name)}${t.subtask?` <span style="color:var(--muted);font-weight:400;font-size:11px">/ ${esc(t.subtask)}</span>`:''}
-          </div>
+          <div class="tracker-task-name">${esc(t.name)} ${streakBadge(streak)}</div>
           ${t.description?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
         </div>
-        <span id="count-${t.id}" style="font-family:var(--mono);font-size:11px;color:${pct===100?'var(--success)':pct>0?'var(--partial)':'var(--muted)'}">${doneCount}/${freq}</span>
+        <span id="count-${t.id}" style="font-family:var(--mono);font-size:11px;color:${c.pct===100?'var(--success)':c.pct>0?'var(--partial)':'var(--muted)'}">${c.countLabel}</span>
       </div>
-      <div class="checkboxes">
-        ${Array.from({length:freq},(_,i) => `
-          <label class="check-item">
-            <input type="checkbox" ${checks[i]?'checked':''} onchange="toggleCheck('${t.id}',${i+1},this.checked,'${ds}')">
-            <span class="check-label">#${i+1}</span>
-          </label>
-        `).join('')}
-      </div>
+      ${c.html}
       <div class="tracker-progress">
         <div class="tracker-progress-fill" id="prog-${t.id}"
-          style="width:${pct}%;background:${pct===100?'var(--success)':pct>0?'var(--partial)':'var(--accent)'}"></div>
+          style="width:${c.pct}%;background:${c.pct===100?'var(--success)':c.pct>0?'var(--partial)':'var(--accent)'}"></div>
       </div>
     </div>
   `;
 }
 
-async function toggleCheck(taskId, occurrence, done, ds) {
+async function toggleCheck(kind, id, occurrence, done, ds) {
+  const body = {date: ds, occurrence, done};
+  if (kind === 'task') body.task_id = id; else body.subtask_id = id;
+
   await fetch('/api/logs', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({date:ds, task_id:taskId, occurrence, done})
+    body: JSON.stringify(body)
   });
 
-  // update logs cache for this task
-  const key = logs.findIndex(l => l.task_id===taskId && l.occurrence===String(occurrence));
+  const matchKey = l => (kind==='task' ? l.task_id===id : l.subtask_id===id) && l.occurrence===String(occurrence);
+  const key = logs.findIndex(matchKey);
+  const entry = {date: ds, task_id: kind==='task'?id:'', subtask_id: kind==='subtask'?id:'', occurrence:String(occurrence), done: done?'1':'0'};
+  const wasDone = key >= 0 && logs[key].done === '1';
   if (key >= 0) logs[key].done = done?'1':'0';
-  else logs.push({date:ds, task_id:taskId, occurrence:String(occurrence), done:done?'1':'0'});
+  else logs.push(entry);
 
-  // update task UI
-  const task = tasks.find(t => t.id===taskId);
-  const freq = parseInt(task.frequency);
-  const doneCount = Array.from({length:freq},(_,i) => {
-    const l = logs.find(l=>l.task_id===taskId && l.occurrence===String(i+1));
-    return l && l.done==='1';
-  }).filter(Boolean).length;
-  const pct = Math.round(doneCount/freq*100);
+  // week/month entities: keep the cached period progress count in sync
+  if (occurrence === 1 && done !== wasDone) {
+    const bucket = kind === 'task' ? periodProgress.tasks : periodProgress.subtasks;
+    if (bucket && bucket[id]) bucket[id].done += done ? 1 : -1;
+  }
 
-  const bar   = document.getElementById('prog-'+taskId);
-  const count = document.getElementById('count-'+taskId);
-  const box   = document.getElementById('ttask-'+taskId);
-  if (bar)   { bar.style.width = pct+'%'; bar.style.background = pct===100?'var(--success)':pct>0?'var(--partial)':'var(--accent)'; }
-  if (count) { count.textContent=`${doneCount}/${freq}`; count.style.color=pct===100?'var(--success)':pct>0?'var(--partial)':'var(--muted)'; }
-  if (box)   { box.classList.toggle('all-done', doneCount===freq); }
+  // simplest correct redraw for this task's card (handles both leaf and subtask-parent counts)
+  const task = tasks.find(t => t.id === (kind==='task' ? id : tasks.find(tt => tt.subtasks.some(s=>s.id===id)).id));
+  const cardHtml = renderTrackerTask(task, ds);
+  const card = document.getElementById('ttask-' + task.id);
+  if (card) card.outerHTML = cardHtml;
 
-  recalcDaySummary();
+  recalcDaySummary(ds);
 }
 
-function recalcDaySummary() {
+function recalcDaySummary(ds) {
   let total = 0, done = 0;
   tasks.forEach(t => {
-    const freq = parseInt(t.frequency);
-    total += freq;
-    for (let i=1; i<=freq; i++) {
-      const l = logs.find(l => l.task_id===t.id && l.occurrence===String(i));
-      if (l && l.done==='1') done++;
+    if (t.subtasks.length) {
+      t.subtasks.forEach(s => {
+        const c = renderChecklist(s, 'subtask', ds);
+        total += c.todayTotal; done += c.todayDone;
+      });
+    } else {
+      const c = renderChecklist(t, 'task', ds);
+      total += c.todayTotal; done += c.todayDone;
     }
   });
   updateDaySummary(done, total);
