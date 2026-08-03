@@ -1,0 +1,223 @@
+{% extends "index.html" %}
+{% block title %}To-do{% endblock %}
+
+{% block extra_style %}
+.todo-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  transition: border-color .15s;
+}
+.todo-item.done { opacity: .55; }
+.todo-item-row { display: flex; align-items: flex-start; gap: 12px; }
+.todo-check {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  appearance: none;
+  background: var(--surface2);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all .15s;
+}
+.todo-check:checked { background: var(--accent); border-color: var(--accent); }
+.todo-check:checked::after {
+  content: '✓'; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); color: #000; font-size: 11px; font-weight: 700;
+}
+.todo-info { flex: 1; }
+.todo-name {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.todo-item.done .todo-name { text-decoration: line-through; }
+.todo-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+.deadline-badge { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 20px; }
+.deadline-overdue { background: #ff6b6b15; color: var(--fail); border: 1px solid #ff6b6b30; }
+.deadline-soon { background: #ffd06b15; color: var(--partial); border: 1px solid #ffd06b30; }
+.deadline-normal { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+{% endblock %}
+
+{% block content %}
+<div class="panel-header">
+  <div class="panel-sub">One-off things to get done</div>
+  <div class="panel-title">To-do</div>
+</div>
+
+<!-- Add Todo Form -->
+<div class="card">
+  <div class="card-title">+ Add New To-do</div>
+  <div class="form-row">
+    <div>
+      <label>Task Name</label>
+      <input type="text" id="form-name" placeholder="e.g. Renew passport">
+    </div>
+    <div>
+      <label>Deadline</label>
+      <input type="date" id="form-deadline">
+    </div>
+  </div>
+  <div class="form-row full">
+    <div>
+      <label>Description</label>
+      <input type="text" id="form-desc" placeholder="Optional details">
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="addTodo()">Add To-do</button>
+</div>
+
+<!-- Todo List -->
+<div id="todo-list-container"></div>
+
+<!-- Modal root -->
+<div id="modal-root"></div>
+{% endblock %}
+
+{% block extra_script %}
+let todos = [];
+
+async function loadAll() {
+  const r = await fetch('/api/todos');
+  todos = await r.json();
+  renderTodoList();
+}
+
+function deadlineBadge(t) {
+  if (!t.deadline) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(t.deadline + 'T00:00:00');
+  const diffDays = Math.round((d - today) / 86400000);
+  let cls = 'deadline-normal';
+  if (t.is_done !== '1') {
+    if (diffDays < 0) cls = 'deadline-overdue';
+    else if (diffDays <= 2) cls = 'deadline-soon';
+  }
+  const label = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  return `<span class="deadline-badge ${cls}">${diffDays < 0 && t.is_done !== '1' ? 'overdue · ' : ''}${label}</span>`;
+}
+
+async function addTodo() {
+  const name     = document.getElementById('form-name').value.trim();
+  const desc     = document.getElementById('form-desc').value.trim();
+  const deadline = document.getElementById('form-deadline').value;
+  if (!name) { toast('⚠ Task Name is required'); return; }
+
+  await fetch('/api/todos', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, description: desc, deadline})
+  });
+
+  ['form-name','form-desc','form-deadline'].forEach(id => document.getElementById(id).value='');
+  await loadAll();
+  toast('✓ To-do added');
+}
+
+async function toggleTodo(id) {
+  await fetch('/api/todos/' + id + '/toggle', {method:'POST'});
+  await loadAll();
+}
+
+function openEditTodoModal(id) {
+  const t = todos.find(x => x.id === id);
+  showModal('Edit To-do', `
+    <label>Task Name</label>
+    <input type="text" id="m-todo-name" value="${esc(t.name)}">
+    <div style="margin-top:12px"><label>Description</label>
+      <input type="text" id="m-todo-desc" value="${esc(t.description)}"></div>
+    <div style="margin-top:12px"><label>Deadline</label>
+      <input type="date" id="m-todo-deadline" value="${esc(t.deadline)}"></div>
+  `, async () => {
+    const name = document.getElementById('m-todo-name').value.trim();
+    const description = document.getElementById('m-todo-desc').value.trim();
+    const deadline = document.getElementById('m-todo-deadline').value;
+    if (!name) { toast('⚠ Task Name is required'); return false; }
+    await fetch('/api/todos/' + id, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description, deadline})
+    });
+    await loadAll();
+    toast('✓ To-do updated');
+    return true;
+  });
+}
+
+async function deleteTodo(id) {
+  const t = todos.find(x => x.id === id);
+  if (!confirm(`Permanently delete "${t.name}"?`)) return;
+  await fetch('/api/todos/' + id, {method:'DELETE'});
+  await loadAll();
+  toast('To-do deleted');
+}
+
+function renderTodoList() {
+  const container = document.getElementById('todo-list-container');
+  if (!todos.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">☑</div><div class="empty-text">Nothing on your to-do list. Add one above!</div></div>`;
+    return;
+  }
+
+  const pending = todos.filter(t => t.is_done !== '1');
+  const done = todos.filter(t => t.is_done === '1');
+
+  container.innerHTML = pending.map(renderTodoItem).join('')
+    + (done.length ? `<div class="section-divider"></div>` + done.map(renderTodoItem).join('') : '');
+}
+
+function renderTodoItem(t) {
+  const isDone = t.is_done === '1';
+  return `
+    <div class="todo-item${isDone ? ' done' : ''}">
+      <div class="todo-item-row">
+        <input type="checkbox" class="todo-check" ${isDone ? 'checked' : ''} onchange="toggleTodo('${t.id}')">
+        <div class="todo-info">
+          <div class="todo-name">${esc(t.name)} ${deadlineBadge(t)}</div>
+          ${t.description ? `<div class="todo-desc">${esc(t.description)}</div>` : ''}
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" onclick="openEditTodoModal('${t.id}')" title="Edit">✎</button>
+          <button class="icon-btn danger" onclick="deleteTodo('${t.id}')" title="Delete">✕</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showModal(title, bodyHtml, onSave) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-title">${esc(title)}</div>
+        ${bodyHtml}
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="modal-save-btn">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target.id === 'modal-overlay') closeModal();
+  });
+  document.getElementById('modal-save-btn').onclick = async () => {
+    const ok = await onSave();
+    if (ok !== false) closeModal();
+  };
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+loadAll();
+{% endblock %}

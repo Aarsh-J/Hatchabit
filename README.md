@@ -1,18 +1,23 @@
 # Hatchabit
 
-A multi-user habit and task tracker. Each person gets their own account and their own private set of tasks/logs. Runs in the browser, backed by Postgres, deployable for free.
+A multi-user habit and task tracker. Each person gets their own account and their own private set of habits/tasks/logs. Runs in the browser, backed by Postgres, deployable for free.
 
 ---
 
 ## What it does
 
-**Manage Tasks** — Define tasks by category (Physical, Mental, Work, etc.), set how many times a day each must be done, and optionally add sub-tasks and descriptions.
+**Manage Habits** — Group your routines under Habits (e.g. Physical Health, Work), each with a color. Under each Habit, add Tasks with how often they need doing — a number of times per **day**, **week**, or **month** (e.g. "2×/day", "3×/week", "20×/month"). Tasks can optionally have Sub-tasks, each with their own frequency and unit.
 
-**Daily Tracker** — Every day, check off each task as you do it. Tasks with a frequency of 2×/day show two checkboxes. A live progress bar shows how your day is going.
+**Daily Tracker** — Every day, check off each task as you do it.
+- Day-frequency tasks (e.g. 2×/day) show that many checkboxes, resetting each day.
+- Week/month-frequency tasks show a single "done today" checkbox plus a running progress readout (e.g. "1/3 this week").
+A live progress bar shows how your day is going.
 
-**Reports** — See your consistency over any past week or month. Navigate back in time with Prev/Next. Three views: overall score, per-category breakdown, and per-task heatmaps + bar charts.
+**Reports** — See your consistency over any past week or month. Navigate back in time with Prev/Next. Three views: overall score, per-habit breakdown, and per-task heatmaps + bar charts. Day-frequency tasks are judged day by day; week/month-frequency tasks are judged once per period (a week isn't marked "missed" just because it isn't finished yet).
 
-**Accounts** — Register with an email + password. All tasks and logs are scoped to your account, so multiple people can share one deployment without seeing each other's data.
+**To-do** — A separate one-off list (with optional deadlines) for things that aren't recurring habits, kept apart from the Daily Tracker.
+
+**Accounts** — Register with an email + password. All habits, tasks, and logs are scoped to your account, so multiple people can share one deployment without seeing each other's data.
 
 ---
 
@@ -56,6 +61,17 @@ python run.py
 
 The app opens automatically at `http://localhost:5050`. Register an account, then log in.
 
+### Working against a separate dev database
+
+To avoid touching prod data while developing, keep a second Postgres project (e.g. another free Supabase project) for local testing, with its credentials in `.env.dev` instead of `.env`. Two PowerShell launcher scripts pick which one to use without ever touching the other file:
+
+```powershell
+.\run-dev.ps1    # loads .env.dev, runs against the dev database
+.\run-prod.ps1   # loads .env, runs against the real prod database — be careful
+```
+
+Both scripts set env vars directly in the process before starting `run.py`, so whichever one you run wins regardless of what's in the other file.
+
 ---
 
 ## Running with Docker
@@ -83,19 +99,20 @@ Required environment variables on the host:
 
 ### Register / Log In
 - First visit redirects to `/login`; use the link there to `/register` a new account
-- Each account's tasks and logs are completely private to that account
+- Each account's habits, tasks, and logs are completely private to that account
 
-### Manage Tasks
-- Go to **Manage Tasks** in the sidebar
-- Fill in: Type, Task Name, and Times/Day (minimum fields)
-- Optionally add a Sub-task label and Description
-- Tasks are grouped by Type automatically
-- Delete removes the task and all its history permanently
+### Manage Habits
+- Go to **Manage Habits** in the sidebar
+- Create a Habit (name + description) to group related tasks
+- Under a Habit, add a Task: name, description, and how often ("Times" + "Per: Day/Week/Month")
+- Optionally add Sub-tasks under a Task, each with its own frequency and unit
+- "Remove from routine" archives a task/sub-task (keeps its history for reports); the delete button removes it and its history permanently
 
 ### Daily Tracker
 - Go to **Daily Tracker** — it defaults to today
 - Use ← Prev / Next → to navigate to other days
-- Check off each box as you complete each repetition
+- Day-frequency tasks: check off each numbered box as you complete each repetition
+- Week/month-frequency tasks: check the single "today" box; the readout next to it shows cumulative progress for the current week/month
 - A task is fully done when all its boxes are checked (green = done, yellow = partial)
 
 ### Reports
@@ -105,8 +122,13 @@ Required environment variables on the host:
 - Navigation is disabled for periods before your first task was created
 - Three sections:
   - **Overall** — single % score, perfect/partial/missed day counts, best and worst task
-  - **By Category** — per-type % and heatmap
+  - **By Habit** — per-habit % and heatmap
   - **Task Breakdown** — collapsible cards with per-task heatmap and bar chart
+
+### To-do
+- Go to **To-do** for one-off items that aren't recurring habits
+- Add a name, optional description, and optional deadline
+- Check items off as done; overdue/upcoming deadlines are badged
 
 ---
 
@@ -114,17 +136,20 @@ Required environment variables on the host:
 
 ```
 Hatchabit/
-├── run.py              ← Local dev entrypoint
-├── app.py              ← Flask app + all API routes
-├── auth.py             ← Register/login/logout routes
-├── models.py            ← SQLAlchemy models (User, Task, Log)
-├── migrations/          ← Alembic schema migrations
-├── Dockerfile           ← Production container image
+├── run.py               ← Local dev entrypoint
+├── run-dev.ps1           ← Launch locally against .env.dev (dev database)
+├── run-prod.ps1          ← Launch locally against .env (prod database)
+├── app.py                ← Flask app + all API routes
+├── auth.py               ← Register/login/logout routes
+├── models.py              ← SQLAlchemy models (User, Habit, Task, Subtask, Log, ToDo)
+├── migrations/            ← Alembic schema migrations
+├── Dockerfile             ← Production container image
 └── templates/
-    ├── index.html      ← Base layout (nav, shared styles + JS)
-    ├── login.html       ← Login page
-    ├── register.html    ← Registration page
-    ├── manage.html      ← Manage Tasks page
-    ├── tracker.html     ← Daily Tracker page
-    └── report.html      ← Reports page
+    ├── index.html        ← Base layout (nav, shared styles + JS)
+    ├── login.html         ← Login page
+    ├── register.html      ← Registration page
+    ├── manage.html        ← Manage Habits page
+    ├── tracker.html       ← Daily Tracker page
+    ├── report.html        ← Reports page
+    └── todo.html          ← To-do page
 ```

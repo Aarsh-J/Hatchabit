@@ -1,5 +1,5 @@
 {% extends "index.html" %}
-{% block title %}Manage Tasks{% endblock %}
+{% block title %}Manage Habits{% endblock %}
 
 {% block extra_style %}
 .task-item {
@@ -8,11 +8,9 @@
   border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 8px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
   transition: border-color .15s;
 }
+.task-item-row { display: flex; align-items: flex-start; gap: 12px; }
 .task-info { flex: 1; }
 .task-name {
   font-family: var(--display);
@@ -25,20 +23,59 @@
   flex-wrap: wrap;
 }
 .task-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
-.delete-btn {
+.icon-btn {
   background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 14px; padding: 4px;
-  border-radius: 4px; transition: all .15s; opacity: 0;
+  cursor: pointer; font-size: 13px; padding: 4px 6px;
+  border-radius: 4px; transition: all .15s;
 }
-.task-item:hover .delete-btn { opacity: 1; }
-.delete-btn:hover { color: var(--fail); background: #ff6b6b15; }
-.type-group { margin-bottom: 28px; }
+.icon-btn:hover { color: var(--text); background: var(--surface2); }
+.icon-btn.danger:hover { color: var(--fail); background: #ff6b6b15; }
+.row-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.habit-group { margin-bottom: 28px; }
+.habit-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.habit-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.habit-name { font-family: var(--display); font-size: 16px; font-weight: 700; }
+.habit-desc { font-size: 12px; color: var(--muted); margin: 2px 0 12px 21px; }
+.habit-line { flex: 1; height: 1px; background: var(--border); }
+
+.subtask-panel { margin: 10px 0 0 0; padding-left: 16px; border-left: 2px solid var(--border); }
+.subtask-item { display:flex; align-items:center; gap:10px; padding: 6px 0; }
+.subtask-name { font-size: 12px; font-weight: 500; }
+.subtask-add-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.subtask-add-row input { font-size: 12px; padding: 7px 10px; }
+.subtask-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 10px; display: block; }
+
+.archived-section { margin-top: 8px; }
+.archived-toggle { font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; padding: 8px 0; user-select: none; }
+.archived-toggle:hover { color: var(--text); }
+.archived-body { display: none; }
+.archived-body.open { display: block; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: #000000aa; display: flex;
+  align-items: center; justify-content: center; z-index: 2000;
+}
+.modal-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px; width: 420px; max-width: 90vw;
+}
+.modal-title { font-family: var(--display); font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
 {% endblock %}
 
 {% block content %}
 <div class="panel-header">
   <div class="panel-sub">Configure your habits &amp; routines</div>
-  <div class="panel-title">Manage Tasks</div>
+  <div class="panel-title">Manage Habits</div>
+</div>
+
+<!-- Habits -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:0">Habits</div>
+    <button class="btn btn-ghost btn-sm" onclick="openNewHabitModal()">+ New Habit</button>
+  </div>
+  <div id="habit-chip-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
 </div>
 
 <!-- Add Task Form -->
@@ -46,9 +83,8 @@
   <div class="card-title">+ Add New Task</div>
   <div class="form-row">
     <div>
-      <label>Type / Category</label>
-      <input type="text" id="form-type" placeholder="e.g. Physical, Mental, Work" list="type-suggestions">
-      <datalist id="type-suggestions"></datalist>
+      <label>Habit</label>
+      <select id="form-habit"></select>
     </div>
     <div>
       <label>Task Name</label>
@@ -57,16 +93,20 @@
   </div>
   <div class="form-row three">
     <div>
-      <label>Sub-task (optional)</label>
-      <input type="text" id="form-subtask" placeholder="e.g. Running">
-    </div>
-    <div>
       <label>Description</label>
       <input type="text" id="form-desc" placeholder="e.g. Run 20 mins">
     </div>
     <div>
-      <label>Times/Day</label>
-      <input type="number" id="form-freq" value="1" min="1" max="10">
+      <label>Times</label>
+      <input type="number" id="form-freq" value="1" min="1" max="60">
+    </div>
+    <div>
+      <label>Per</label>
+      <select id="form-unit">
+        <option value="day">Day</option>
+        <option value="week">Week</option>
+        <option value="month">Month</option>
+      </select>
     </div>
   </div>
   <button class="btn btn-primary" onclick="addTask()">Add Task</button>
@@ -74,82 +114,408 @@
 
 <!-- Task List -->
 <div id="task-list-container"></div>
+
+<!-- Archived -->
+<div class="archived-section" id="archived-container"></div>
+
+<!-- Modal root -->
+<div id="modal-root"></div>
 {% endblock %}
 
 {% block extra_script %}
+let habits = [];
 let tasks = [];
+let archivedOpen = false;
 
-async function loadTasks() {
-  const r = await fetch('/api/tasks');
-  tasks = await r.json();
-  updateTypeSuggestions();
+async function loadAll() {
+  const [hr, tr] = await Promise.all([fetch('/api/habits'), fetch('/api/tasks')]);
+  habits = await hr.json();
+  tasks = await tr.json();
+  renderHabitChips();
+  renderHabitSelect();
   renderTaskList();
+  renderArchived();
 }
 
-function updateTypeSuggestions() {
-  const types = [...new Set(tasks.map(t => t.type).filter(Boolean))];
-  document.getElementById('type-suggestions').innerHTML = types.map(t => `<option value="${esc(t)}">`).join('');
+// ── HABITS ───────────────────────────────────────────────────────────────
+
+function renderHabitChips() {
+  const c = document.getElementById('habit-chip-list');
+  if (!habits.length) {
+    c.innerHTML = `<span style="font-size:12px;color:var(--muted)">No habits yet — create one to get started.</span>`;
+    return;
+  }
+  c.innerHTML = habits.map(h => `
+    <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 12px;font-size:12px">
+      <span class="habit-dot" style="background:${esc(h.color)}"></span>${esc(h.name)}
+      <button class="icon-btn" onclick="openEditHabitModal('${h.id}')" title="Edit">✎</button>
+      <button class="icon-btn danger" onclick="deleteHabit('${h.id}')" title="Delete">✕</button>
+    </span>
+  `).join('');
 }
+
+function renderHabitSelect() {
+  const sel = document.getElementById('form-habit');
+  if (!habits.length) {
+    sel.innerHTML = `<option value="">Create a habit first</option>`;
+    return;
+  }
+  sel.innerHTML = habits.map(h => `<option value="${h.id}">${esc(h.name)}</option>`).join('');
+}
+
+function openNewHabitModal() {
+  showModal('New Habit', `
+    <label>Name</label>
+    <input type="text" id="m-habit-name" placeholder="e.g. Physical Health">
+    <div style="margin-top:12px">
+      <label>Description</label>
+      <textarea id="m-habit-desc" placeholder="What this habit covers"></textarea>
+    </div>
+  `, async () => {
+    const name = document.getElementById('m-habit-name').value.trim();
+    const description = document.getElementById('m-habit-desc').value.trim();
+    if (!name) { toast('⚠ Habit name is required'); return false; }
+    await fetch('/api/habits', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description})
+    });
+    await loadAll();
+    toast('✓ Habit created');
+    return true;
+  });
+}
+
+function openEditHabitModal(id) {
+  const h = habits.find(x => x.id === id);
+  showModal('Edit Habit', `
+    <label>Name</label>
+    <input type="text" id="m-habit-name" value="${esc(h.name)}">
+    <div style="margin-top:12px">
+      <label>Description</label>
+      <textarea id="m-habit-desc">${esc(h.description)}</textarea>
+    </div>
+  `, async () => {
+    const name = document.getElementById('m-habit-name').value.trim();
+    const description = document.getElementById('m-habit-desc').value.trim();
+    if (!name) { toast('⚠ Habit name is required'); return false; }
+    await fetch('/api/habits/' + id, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description})
+    });
+    await loadAll();
+    toast('✓ Habit updated');
+    return true;
+  });
+}
+
+async function deleteHabit(id) {
+  const h = habits.find(x => x.id === id);
+  const taskCount = tasks.filter(t => t.habit_id === id).length;
+  if (!confirm(`Delete habit "${h.name}"? This permanently deletes it and all ${taskCount} task(s) (and their subtasks/history) under it. This cannot be undone.`)) return;
+  await fetch('/api/habits/' + id, {method:'DELETE'});
+  await loadAll();
+  toast('Habit deleted');
+}
+
+// ── TASKS ────────────────────────────────────────────────────────────────
 
 async function addTask() {
-  const type    = document.getElementById('form-type').value.trim();
-  const name    = document.getElementById('form-name').value.trim();
-  const subtask = document.getElementById('form-subtask').value.trim();
-  const desc    = document.getElementById('form-desc').value.trim();
-  const freq    = parseInt(document.getElementById('form-freq').value) || 1;
-  if (!type || !name) { toast('⚠ Type and Task Name are required'); return; }
+  const habit_id = document.getElementById('form-habit').value;
+  const name     = document.getElementById('form-name').value.trim();
+  const desc     = document.getElementById('form-desc').value.trim();
+  const freq     = parseInt(document.getElementById('form-freq').value) || 1;
+  const unit     = document.getElementById('form-unit').value;
+  if (!habit_id) { toast('⚠ Create/select a habit first'); return; }
+  if (!name) { toast('⚠ Task Name is required'); return; }
 
   await fetch('/api/tasks', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({type, name, subtask, description: desc, frequency: freq})
+    body: JSON.stringify({habit_id, name, description: desc, frequency: freq, unit})
   });
 
-  ['form-type','form-name','form-subtask','form-desc'].forEach(id => document.getElementById(id).value='');
+  ['form-name','form-desc'].forEach(id => document.getElementById(id).value='');
   document.getElementById('form-freq').value = '1';
-  await loadTasks();
+  document.getElementById('form-unit').value = 'day';
+  await loadAll();
   toast('✓ Task added');
 }
 
-async function deleteTask(id) {
-  await fetch('/api/tasks/' + id, {method:'DELETE'});
-  await loadTasks();
-  toast('Task removed');
+function openEditTaskModal(id) {
+  const t = tasks.find(x => x.id === id);
+  const options = habits.map(h => `<option value="${h.id}" ${h.id===t.habit_id?'selected':''}>${esc(h.name)}</option>`).join('');
+  showModal('Edit Task', `
+    <label>Habit</label>
+    <select id="m-task-habit">${options}</select>
+    <div style="margin-top:12px"><label>Task Name</label>
+      <input type="text" id="m-task-name" value="${esc(t.name)}"></div>
+    <div style="margin-top:12px"><label>Description</label>
+      <input type="text" id="m-task-desc" value="${esc(t.description)}"></div>
+    <div class="form-row" style="margin-top:12px">
+      <div><label>Times</label>
+        <input type="number" id="m-task-freq" value="${t.frequency}" min="1" max="60"></div>
+      <div><label>Per</label>
+        <select id="m-task-unit">
+          <option value="day" ${t.unit==='day'?'selected':''}>Day</option>
+          <option value="week" ${t.unit==='week'?'selected':''}>Week</option>
+          <option value="month" ${t.unit==='month'?'selected':''}>Month</option>
+        </select></div>
+    </div>
+  `, async () => {
+    const habit_id = document.getElementById('m-task-habit').value;
+    const name = document.getElementById('m-task-name').value.trim();
+    const description = document.getElementById('m-task-desc').value.trim();
+    const frequency = parseInt(document.getElementById('m-task-freq').value) || 1;
+    const unit = document.getElementById('m-task-unit').value;
+    if (!name) { toast('⚠ Task Name is required'); return false; }
+    await fetch('/api/tasks/' + id, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({habit_id, name, description, frequency, unit})
+    });
+    await loadAll();
+    toast('✓ Task updated');
+    return true;
+  });
 }
+
+async function archiveTask(id) {
+  await fetch('/api/tasks/' + id + '/archive', {method:'POST'});
+  await loadAll();
+  toast('Removed from routine');
+}
+
+async function restoreTask(id) {
+  await fetch('/api/tasks/' + id + '/restore', {method:'POST'});
+  await loadAll();
+  toast('✓ Task restored');
+}
+
+async function deleteTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!confirm(`Permanently delete "${t.name}"? This will delete all its history and subtasks. This cannot be undone.`)) return;
+  await fetch('/api/tasks/' + id, {method:'DELETE'});
+  await loadAll();
+  toast('Task deleted');
+}
+
+// ── SUBTASKS ─────────────────────────────────────────────────────────────
+
+async function addSubtask(taskId) {
+  const nameEl = document.getElementById('sub-name-' + taskId);
+  const name = nameEl.value.trim();
+  if (!name) { toast('⚠ Subtask name is required'); return; }
+  await fetch(`/api/tasks/${taskId}/subtasks`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name, description:'', frequency:1})
+  });
+  await loadAll();
+  toast('✓ Subtask added');
+}
+
+function openEditSubtaskModal(id) {
+  let st;
+  for (const t of tasks) { st = t.subtasks.find(s => s.id === id); if (st) break; }
+  showModal('Edit Subtask', `
+    <label>Name</label>
+    <input type="text" id="m-sub-name" value="${esc(st.name)}">
+    <div style="margin-top:12px"><label>Description</label>
+      <input type="text" id="m-sub-desc" value="${esc(st.description)}"></div>
+    <div class="form-row" style="margin-top:12px">
+      <div><label>Times</label>
+        <input type="number" id="m-sub-freq" value="${st.frequency}" min="1" max="60"></div>
+      <div><label>Per</label>
+        <select id="m-sub-unit">
+          <option value="day" ${st.unit==='day'?'selected':''}>Day</option>
+          <option value="week" ${st.unit==='week'?'selected':''}>Week</option>
+          <option value="month" ${st.unit==='month'?'selected':''}>Month</option>
+        </select></div>
+    </div>
+  `, async () => {
+    const name = document.getElementById('m-sub-name').value.trim();
+    const description = document.getElementById('m-sub-desc').value.trim();
+    const frequency = parseInt(document.getElementById('m-sub-freq').value) || 1;
+    const unit = document.getElementById('m-sub-unit').value;
+    if (!name) { toast('⚠ Subtask name is required'); return false; }
+    await fetch('/api/subtasks/' + id, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description, frequency, unit})
+    });
+    await loadAll();
+    toast('✓ Subtask updated');
+    return true;
+  });
+}
+
+async function archiveSubtask(id) {
+  await fetch('/api/subtasks/' + id + '/archive', {method:'POST'});
+  await loadAll();
+  toast('Removed from routine');
+}
+
+async function restoreSubtask(id) {
+  await fetch('/api/subtasks/' + id + '/restore', {method:'POST'});
+  await loadAll();
+  toast('✓ Subtask restored');
+}
+
+async function deleteSubtask(id, name) {
+  if (!confirm(`Permanently delete subtask "${name}"? This will delete all its history. This cannot be undone.`)) return;
+  await fetch('/api/subtasks/' + id, {method:'DELETE'});
+  await loadAll();
+  toast('Subtask deleted');
+}
+
+// ── RENDER: ACTIVE LIST ──────────────────────────────────────────────────
 
 function renderTaskList() {
   const container = document.getElementById('task-list-container');
-  if (!tasks.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">No tasks yet. Add your first one above!</div></div>`;
+
+  if (!habits.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-text">Create a habit above, then add tasks under it!</div></div>`;
     return;
   }
 
-  const groups = {};
-  tasks.forEach(t => { if (!groups[t.type]) groups[t.type]=[]; groups[t.type].push(t); });
-
-  container.innerHTML = Object.entries(groups).map(([type, items]) => `
-    <div class="type-group">
-      <div class="type-header">
-        <span class="type-badge">${esc(type)}</span>
-        <div class="type-line"></div>
+  // Full Habit → Task → Subtask view: every habit is shown (even with zero tasks),
+  // with its description, and every task's subtasks are always visible (not collapsed).
+  container.innerHTML = habits.map(h => {
+    const items = tasks.filter(t => t.habit_id === h.id && t.is_active === '1');
+    return `
+    <div class="habit-group">
+      <div class="habit-header">
+        <span class="habit-dot" style="background:${esc(h.color)}"></span>
+        <span class="habit-name">${esc(h.name)}</span>
+        <div class="habit-line"></div>
         <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${items.length} task${items.length!==1?'s':''}</span>
       </div>
-      ${items.map(t => `
-        <div class="task-item">
-          <div class="task-info">
-            <div class="task-name">
-              ${esc(t.name)}
-              ${t.subtask ? `<span style="color:var(--muted);font-weight:400">/ ${esc(t.subtask)}</span>` : ''}
-              <span class="freq-badge">${t.frequency}×/day</span>
-            </div>
-            ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
-          </div>
-          <button class="delete-btn" onclick="deleteTask('${t.id}')" title="Delete">✕</button>
-        </div>
-      `).join('')}
-    </div>
-  `).join('');
+      ${h.description ? `<div class="habit-desc">${esc(h.description)}</div>` : ''}
+      ${items.length
+        ? items.map(t => renderTaskItem(t)).join('')
+        : `<div style="font-size:12px;color:var(--muted);margin:0 0 20px 21px">No tasks yet under this habit.</div>`}
+    </div>`;
+  }).join('');
 }
 
-loadTasks();
+function renderTaskItem(t) {
+  const activeSubtasks = t.subtasks.filter(s => s.is_active === '1');
+  return `
+    <div class="task-item">
+      <div class="task-item-row">
+        <div class="task-info">
+          <div class="task-name">
+            ${esc(t.name)}
+            <span class="freq-badge">${freqLabel(t)}</span>
+          </div>
+          ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+        </div>
+        <div class="row-actions">
+          <button class="icon-btn" onclick="openEditTaskModal('${t.id}')" title="Edit">✎</button>
+          <button class="icon-btn" onclick="archiveTask('${t.id}')" title="Remove from routine">⤓</button>
+          <button class="icon-btn danger" onclick="deleteTask('${t.id}')" title="Delete permanently">✕</button>
+        </div>
+      </div>
+      <span class="subtask-label">Subtasks</span>
+      <div class="subtask-panel">
+        ${activeSubtasks.map(s => `
+          <div class="subtask-item">
+            <span class="subtask-name" style="flex:1">${esc(s.name)} <span class="freq-badge">${freqLabel(s)}</span></span>
+            <button class="icon-btn" onclick="openEditSubtaskModal('${s.id}')" title="Edit">✎</button>
+            <button class="icon-btn" onclick="archiveSubtask('${s.id}')" title="Remove from routine">⤓</button>
+            <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}')" title="Delete permanently">✕</button>
+          </div>
+        `).join('')}
+        <div class="subtask-add-row">
+          <input type="text" id="sub-name-${t.id}" placeholder="New subtask name">
+          <button class="btn btn-ghost btn-sm" onclick="addSubtask('${t.id}')">+ Add Subtask</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── RENDER: ARCHIVED ─────────────────────────────────────────────────────
+
+function renderArchived() {
+  const container = document.getElementById('archived-container');
+  const archivedTasks = tasks.filter(t => t.is_active === '0');
+  const archivedSubtasksByTask = {};
+  tasks.forEach(t => { archivedSubtasksByTask[t.id] = t.subtasks.filter(s => s.is_active === '0'); });
+  const anyArchivedSubtasks = Object.values(archivedSubtasksByTask).some(l => l.length);
+
+  if (!archivedTasks.length && !anyArchivedSubtasks) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const habitName = id => (habits.find(h => h.id === id) || {}).name || '—';
+
+  const taskRows = archivedTasks.map(t => `
+    <div class="task-item">
+      <div class="task-item-row">
+        <div class="task-info">
+          <div class="task-name">${esc(t.name)}<span class="freq-badge">${freqLabel(t)}</span><span class="inactive-badge" style="margin-left:0">archived</span></div>
+          <div class="task-desc">${esc(habitName(t.habit_id))}${t.description ? ' · ' + esc(t.description) : ''}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="restoreTask('${t.id}')">Restore</button>
+          <button class="icon-btn danger" onclick="deleteTask('${t.id}')" title="Delete permanently">✕</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  const subtaskRows = tasks.flatMap(t => (archivedSubtasksByTask[t.id]||[]).map(s => `
+    <div class="task-item">
+      <div class="task-item-row">
+        <div class="task-info">
+          <div class="task-name">${esc(s.name)}<span class="freq-badge">${freqLabel(s)}</span><span class="inactive-badge" style="margin-left:0">archived</span></div>
+          <div class="task-desc">subtask of ${esc(t.name)}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost btn-sm" onclick="restoreSubtask('${s.id}')">Restore</button>
+          <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}')" title="Delete permanently">✕</button>
+        </div>
+      </div>
+    </div>
+  `)).join('');
+
+  container.innerHTML = `
+    <div class="archived-toggle" onclick="archivedOpen=!archivedOpen; renderArchived();">
+      ${archivedOpen ? '▾' : '▸'} Archived (${archivedTasks.length + tasks.reduce((n,t)=>n+(archivedSubtasksByTask[t.id]||[]).length,0)})
+    </div>
+    <div class="archived-body ${archivedOpen ? 'open' : ''}">
+      ${taskRows}${subtaskRows}
+    </div>
+  `;
+}
+
+// ── MODAL ────────────────────────────────────────────────────────────────
+
+function showModal(title, bodyHtml, onSave) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-title">${esc(title)}</div>
+        ${bodyHtml}
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="modal-save-btn">Save</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target.id === 'modal-overlay') closeModal();
+  });
+  document.getElementById('modal-save-btn').onclick = async () => {
+    const ok = await onSave();
+    if (ok !== false) closeModal();
+  };
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+loadAll();
 {% endblock %}

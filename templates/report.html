@@ -186,6 +186,21 @@
 .legend { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .legend-dot  { width: 10px; height: 10px; border-radius: 3px; }
+
+/* SUBTASK ROWS inside task */
+.subtask-row {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 0 18px;
+  border-left: 2px solid var(--border);
+}
+.subtask-row-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.subtask-row-name   { font-family: var(--display); font-size: 12px; font-weight: 700; }
+
+/* STREAK BADGE */
+.streak-badge { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; background:#ff8a6b15; color:#ff8a6b; border:1px solid #ff8a6b30; }
 {% endblock %}
 
 {% block content %}
@@ -344,7 +359,7 @@ function renderReport(data) {
 
   root.innerHTML =
     renderOverall(data, dates) +
-    renderTypeSummary(data, dates) +
+    renderHabitSummary(data, dates) +
     renderTaskWise(data, dates);
 }
 
@@ -386,6 +401,9 @@ function renderOverall(data, dates) {
           🏆 <span style="color:var(--success)">${esc(best.name)}</span> is your best (${best.success_pct}%)
           ${worst && worst.id!==best.id ? `· ⚠ <span style="color:var(--fail)">${esc(worst.name)}</span> needs work (${worst.success_pct}%)` : ''}
         </div>` : ''}
+        ${ov.streak && (ov.streak.current || ov.streak.best) ? `<div>
+          <span class="streak-badge">🔥 current streak: ${ov.streak.current}d · best: ${ov.streak.best}d</span>
+        </div>` : ''}
       </div>
     </div>
 
@@ -399,42 +417,43 @@ function renderOverall(data, dates) {
 
 // ── TYPE SUMMARY ─────────────────────────────────────────────────────────────
 
-function renderTypeSummary(data, dates) {
-  const ts = data.type_summary;
-  const entries = Object.values(ts).sort((a,b) => b.avg_pct - a.avg_pct);
+function renderHabitSummary(data, dates) {
+  const hs = data.habit_summary;
+  const entries = Object.values(hs).sort((a,b) => b.avg_pct - a.avg_pct);
 
-  const rows = entries.map(t => {
-    const col = t.avg_pct>=70?'var(--success)':t.avg_pct>=40?'var(--partial)':'var(--fail)';
+  const rows = entries.map(h => {
+    const col = h.avg_pct>=70?'var(--success)':h.avg_pct>=40?'var(--partial)':'var(--fail)';
     return `
-      <div class="card" style="margin-bottom:12px">
+      <div class="card" style="margin-bottom:12px;border-left:3px solid ${h.color}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div>
-            <div style="font-family:var(--display);font-size:15px;font-weight:700">${esc(t.type)}</div>
+            <div style="font-family:var(--display);font-size:15px;font-weight:700">${esc(h.name)}</div>
             <div style="font-size:11px;color:var(--muted);margin-top:2px">
-              ${t.task_count} task${t.task_count!==1?'s':''} ·
-              <span style="color:var(--success)">✓ ${t.success_days}d</span> ·
-              <span style="color:var(--partial)">◑ ${t.partial_days}d</span> ·
-              <span style="color:var(--fail)">✕ ${t.fail_days}d</span>
+              ${h.task_count} task${h.task_count!==1?'s':''} ·
+              <span style="color:var(--success)">✓ ${h.success_days}d</span> ·
+              <span style="color:var(--partial)">◑ ${h.partial_days}d</span> ·
+              <span style="color:var(--fail)">✕ ${h.fail_days}d</span>
+              ${h.streak && h.streak.current ? ` · <span class="streak-badge">🔥 ${h.streak.current}d</span>` : ''}
             </div>
           </div>
           <div style="text-align:right">
-            <div style="font-family:var(--display);font-size:28px;font-weight:800;color:${col}">${t.avg_pct}%</div>
+            <div style="font-family:var(--display);font-size:28px;font-weight:800;color:${col}">${h.avg_pct}%</div>
             <div style="font-size:10px;color:var(--muted);font-family:var(--mono)">avg success</div>
           </div>
         </div>
         <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:12px">
-          <div style="height:100%;width:${t.avg_pct}%;background:${col};border-radius:4px;transition:width .6s"></div>
+          <div style="height:100%;width:${h.avg_pct}%;background:${col};border-radius:4px;transition:width .6s"></div>
         </div>
-        ${heatmap(dates, t.day_status)}
+        ${heatmap(dates, h.day_status)}
       </div>
     `;
   }).join('');
 
   return `
     <div class="section-header">
-      <div class="section-label">By Category</div>
+      <div class="section-label">By Habit</div>
       <div class="section-line"></div>
-      <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${entries.length} categories</span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${entries.length} habits</span>
     </div>
     ${rows}
   `;
@@ -443,22 +462,42 @@ function renderTypeSummary(data, dates) {
 // ── TASK-WISE ─────────────────────────────────────────────────────────────────
 
 function renderTaskWise(data, dates) {
-  const ts = data.type_summary;
-  const entries = Object.values(ts).sort((a,b) => b.avg_pct - a.avg_pct);
+  const hs = data.habit_summary;
+  const entries = Object.values(hs).sort((a,b) => b.avg_pct - a.avg_pct);
 
-  const cards = entries.map((typeData, idx) => {
-    const tasks = [...typeData.tasks].sort((a,b) => b.success_pct - a.success_pct);
+  const cards = entries.map((habitData, idx) => {
+    const tasks = [...habitData.tasks].sort((a,b) => b.success_pct - a.success_pct);
     const taskRows = tasks.map(s => {
       const pc = pctClass(s.success_pct);
       const isInactive = s.is_active === '0';
+      const subtaskRows = (s.subtasks || []).map(sub => {
+        const spc = pctClass(sub.success_pct);
+        const subInactive = sub.is_active === '0';
+        return `
+          <div class="subtask-row">
+            <div class="subtask-row-header">
+              <div class="subtask-row-name">
+                ${esc(sub.name)}
+                <span class="freq-badge">${freqLabel(sub)}</span>
+                ${subInactive ? `<span class="inactive-badge">archived</span>` : ''}
+                ${sub.streak && sub.streak.current ? `<span class="streak-badge">🔥 ${sub.streak.current}</span>` : ''}
+              </div>
+              <span class="pct-badge ${spc}">${sub.success_pct}%</span>
+            </div>
+            <div class="task-row-meta">✓ ${sub.success_days}d · ◑ ${sub.partial_days}d · ✕ ${sub.fail_days}d missed</div>
+            ${heatmap(dates, sub.daily_results)}
+          </div>
+        `;
+      }).join('');
       return `
         <div class="task-row">
           <div class="task-row-header">
             <div>
               <div class="task-row-name">
-                ${esc(s.name)}${s.subtask?` <span style="color:var(--muted);font-weight:400;font-size:11px">/ ${esc(s.subtask)}</span>`:''}
-                <span class="freq-badge">${s.frequency}×/day</span>
+                ${esc(s.name)}
+                <span class="freq-badge">${freqLabel(s)}</span>
                 ${isInactive ? `<span class="inactive-badge">archived</span>` : ''}
+                ${s.streak && s.streak.current ? `<span class="streak-badge">🔥 ${s.streak.current}d · best ${s.streak.best}d</span>` : ''}
               </div>
             </div>
             <span class="pct-badge ${pc}">${s.success_pct}%</span>
@@ -469,19 +508,20 @@ function renderTaskWise(data, dates) {
           </div>
           ${heatmap(dates, s.daily_results)}
           ${dates.length > 1 ? barChart(dates, s.daily_results) : ''}
+          ${subtaskRows}
         </div>
       `;
     }).join('');
 
     return `
-      <div class="type-card" id="tcard-${idx}">
+      <div class="type-card" id="tcard-${idx}" style="border-left:3px solid ${habitData.color}">
         <div class="type-card-header" onclick="toggleCard(${idx})" id="tcard-hdr-${idx}">
           <div>
-            <div class="type-card-title">${esc(typeData.type)}</div>
-            <div class="type-card-meta">${tasks.length} task${tasks.length!==1?'s':''} · ${typeData.avg_pct}% avg</div>
+            <div class="type-card-title">${esc(habitData.name)}</div>
+            <div class="type-card-meta">${tasks.length} task${tasks.length!==1?'s':''} · ${habitData.avg_pct}% avg</div>
           </div>
           <div class="type-card-right">
-            <span class="pct-badge ${pctClass(typeData.avg_pct)}">${typeData.avg_pct}%</span>
+            <span class="pct-badge ${pctClass(habitData.avg_pct)}">${habitData.avg_pct}%</span>
             <span class="expand-icon">▼</span>
           </div>
         </div>
