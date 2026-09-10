@@ -6,9 +6,10 @@ from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
+from sqlalchemy import text
 
-from auth import auth_bp
-from models import Habit, Log, Subtask, Task, ToDo, User, db, HABIT_PALETTE
+from .auth import auth_bp
+from .models import Habit, Log, Subtask, Task, ToDo, User, db, HABIT_PALETTE
 
 load_dotenv()
 
@@ -31,6 +32,16 @@ def load_user(user_id):
 
 
 app.register_blueprint(auth_bp)
+
+
+@app.before_request
+def _set_rls_user():
+    # Row-level security policies key off this session setting; setting it
+    # (not SET LOCAL) on every request overwrites whatever a previous
+    # request left on this pooled connection, so stale values can't leak
+    # across users. Unauthenticated requests get -1, which matches no rows.
+    uid = current_user.id if current_user.is_authenticated else -1
+    db.session.execute(text("SELECT set_config('app.current_user_id', :uid, false)"), {"uid": str(uid)})
 
 # ── PAGE ROUTES ───────────────────────────────────────────────────────────────
 
@@ -232,6 +243,7 @@ def restore_task(task_id):
 @login_required
 def delete_task(task_id):
     # Hard delete: remove task + subtasks + all related logs permanently
+    _get_owned_task(task_id)  # ensures ownership
     subtask_ids = [s.id for s in Subtask.query.filter_by(task_id=task_id).all()]
     if subtask_ids:
         Log.query.filter(Log.user_id == current_user.id, Log.subtask_id.in_(subtask_ids)).delete(synchronize_session=False)

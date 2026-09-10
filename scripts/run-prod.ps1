@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 # Runs Hatchabit locally against the PROD database (.env). Be careful - this
 # is the real Supabase data behind the live deployment.
-$envFile = Join-Path $PSScriptRoot ".env"
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$envFile = Join-Path $repoRoot ".env"
 if (-not (Test-Path $envFile)) {
     Write-Error "Missing .env - create it with the prod DATABASE_URL + SECRET_KEY."
     exit 1
@@ -16,4 +17,4 @@ Get-Content $envFile | ForEach-Object {
 }
 
 Write-Host "-> Running against PROD database - changes are LIVE" -ForegroundColor Red
-python run.py
+python (Join-Path $repoRoot "run.py")

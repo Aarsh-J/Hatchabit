@@ -52,7 +52,7 @@ pip install -r requirements.txt
 #   SECRET_KEY="<random secret>"
 
 # 4. Apply database migrations
-export FLASK_APP=app.py   # (Windows: set FLASK_APP=app.py)
+export FLASK_APP=src.app   # (Windows: set FLASK_APP=src.app)
 flask db upgrade
 
 # 5. Run
@@ -66,8 +66,8 @@ The app opens automatically at `http://localhost:5050`. Register an account, the
 To avoid touching prod data while developing, keep a second Postgres project (e.g. another free Supabase project) for local testing, with its credentials in `.env.dev` instead of `.env`. Two PowerShell launcher scripts pick which one to use without ever touching the other file:
 
 ```powershell
-.\run-dev.ps1    # loads .env.dev, runs against the dev database
-.\run-prod.ps1   # loads .env, runs against the real prod database — be careful
+.\scripts\run-dev.ps1    # loads .env.dev, runs against the dev database
+.\scripts\run-prod.ps1   # loads .env, runs against the real prod database — be careful
 ```
 
 Both scripts set env vars directly in the process before starting `run.py`, so whichever one you run wins regardless of what's in the other file.
@@ -136,20 +136,23 @@ Required environment variables on the host:
 
 ```
 Hatchabit/
-├── run.py               ← Local dev entrypoint
-├── run-dev.ps1           ← Launch locally against .env.dev (dev database)
-├── run-prod.ps1          ← Launch locally against .env (prod database)
-├── app.py                ← Flask app + all API routes
-├── auth.py               ← Register/login/logout routes
-├── models.py              ← SQLAlchemy models (User, Habit, Task, Subtask, Log, ToDo)
+├── run.py                 ← Local dev entrypoint
+├── src/
+│   ├── app.py             ← Flask app + all API routes
+│   ├── auth.py            ← Register/login/logout routes
+│   ├── models.py          ← SQLAlchemy models (User, Habit, Task, Subtask, Log, ToDo)
+│   └── templates/
+│       ├── index.html     ← Base layout (nav, shared styles + JS)
+│       ├── login.html     ← Login page
+│       ├── register.html  ← Registration page
+│       ├── manage.html    ← Manage Habits page
+│       ├── tracker.html   ← Daily Tracker page
+│       ├── report.html    ← Reports page
+│       └── todo.html      ← To-do page
+├── scripts/
+│   ├── run-dev.ps1        ← Launch locally against .env.dev (dev database)
+│   └── run-prod.ps1       ← Launch locally against .env (prod database)
 ├── migrations/            ← Alembic schema migrations
-├── Dockerfile             ← Production container image
-└── templates/
-    ├── index.html        ← Base layout (nav, shared styles + JS)
-    ├── login.html         ← Login page
-    ├── register.html      ← Registration page
-    ├── manage.html        ← Manage Habits page
-    ├── tracker.html       ← Daily Tracker page
-    ├── report.html        ← Reports page
-    └── todo.html          ← To-do page
+├── docs/                  ← Planning notes, not part of the app
+└── Dockerfile             ← Production container image
 ```

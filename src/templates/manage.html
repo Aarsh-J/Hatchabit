@@ -109,7 +109,7 @@
       </select>
     </div>
   </div>
-  <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+  <button class="btn btn-primary" onclick="addTask(this)">Add Task</button>
 </div>
 
 <!-- Task List -->
@@ -149,7 +149,7 @@ function renderHabitChips() {
     <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 12px;font-size:12px">
       <span class="habit-dot" style="background:${esc(h.color)}"></span>${esc(h.name)}
       <button class="icon-btn" onclick="openEditHabitModal('${h.id}')" title="Edit">✎</button>
-      <button class="icon-btn danger" onclick="deleteHabit('${h.id}')" title="Delete">✕</button>
+      <button class="icon-btn danger" onclick="deleteHabit('${h.id}', this)" title="Delete">✕</button>
     </span>
   `).join('');
 }
@@ -208,18 +208,23 @@ function openEditHabitModal(id) {
   });
 }
 
-async function deleteHabit(id) {
+async function deleteHabit(id, btn) {
   const h = habits.find(x => x.id === id);
   const taskCount = tasks.filter(t => t.habit_id === id).length;
   if (!confirm(`Delete habit "${h.name}"? This permanently deletes it and all ${taskCount} task(s) (and their subtasks/history) under it. This cannot be undone.`)) return;
-  await fetch('/api/habits/' + id, {method:'DELETE'});
-  await loadAll();
-  toast('Habit deleted');
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/habits/' + id, {method:'DELETE'});
+    await loadAll();
+    toast('Habit deleted');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 // ── TASKS ────────────────────────────────────────────────────────────────
 
-async function addTask() {
+async function addTask(btn) {
   const habit_id = document.getElementById('form-habit').value;
   const name     = document.getElementById('form-name').value.trim();
   const desc     = document.getElementById('form-desc').value.trim();
@@ -228,17 +233,22 @@ async function addTask() {
   if (!habit_id) { toast('⚠ Create/select a habit first'); return; }
   if (!name) { toast('⚠ Task Name is required'); return; }
 
-  await fetch('/api/tasks', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({habit_id, name, description: desc, frequency: freq, unit})
-  });
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({habit_id, name, description: desc, frequency: freq, unit})
+    });
 
-  ['form-name','form-desc'].forEach(id => document.getElementById(id).value='');
-  document.getElementById('form-freq').value = '1';
-  document.getElementById('form-unit').value = 'day';
-  await loadAll();
-  toast('✓ Task added');
+    ['form-name','form-desc'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('form-freq').value = '1';
+    document.getElementById('form-unit').value = 'day';
+    await loadAll();
+    toast('✓ Task added');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 function openEditTaskModal(id) {
@@ -278,38 +288,58 @@ function openEditTaskModal(id) {
   });
 }
 
-async function archiveTask(id) {
-  await fetch('/api/tasks/' + id + '/archive', {method:'POST'});
-  await loadAll();
-  toast('Removed from routine');
+async function archiveTask(id, btn) {
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/tasks/' + id + '/archive', {method:'POST'});
+    await loadAll();
+    toast('Removed from routine');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
-async function restoreTask(id) {
-  await fetch('/api/tasks/' + id + '/restore', {method:'POST'});
-  await loadAll();
-  toast('✓ Task restored');
+async function restoreTask(id, btn) {
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/tasks/' + id + '/restore', {method:'POST'});
+    await loadAll();
+    toast('✓ Task restored');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
-async function deleteTask(id) {
+async function deleteTask(id, btn) {
   const t = tasks.find(x => x.id === id);
   if (!confirm(`Permanently delete "${t.name}"? This will delete all its history and subtasks. This cannot be undone.`)) return;
-  await fetch('/api/tasks/' + id, {method:'DELETE'});
-  await loadAll();
-  toast('Task deleted');
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/tasks/' + id, {method:'DELETE'});
+    await loadAll();
+    toast('Task deleted');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 // ── SUBTASKS ─────────────────────────────────────────────────────────────
 
-async function addSubtask(taskId) {
+async function addSubtask(taskId, btn) {
   const nameEl = document.getElementById('sub-name-' + taskId);
   const name = nameEl.value.trim();
   if (!name) { toast('⚠ Subtask name is required'); return; }
-  await fetch(`/api/tasks/${taskId}/subtasks`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({name, description:'', frequency:1})
-  });
-  await loadAll();
-  toast('✓ Subtask added');
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description:'', frequency:1})
+    });
+    await loadAll();
+    toast('✓ Subtask added');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 function openEditSubtaskModal(id) {
@@ -346,23 +376,38 @@ function openEditSubtaskModal(id) {
   });
 }
 
-async function archiveSubtask(id) {
-  await fetch('/api/subtasks/' + id + '/archive', {method:'POST'});
-  await loadAll();
-  toast('Removed from routine');
+async function archiveSubtask(id, btn) {
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/subtasks/' + id + '/archive', {method:'POST'});
+    await loadAll();
+    toast('Removed from routine');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
-async function restoreSubtask(id) {
-  await fetch('/api/subtasks/' + id + '/restore', {method:'POST'});
-  await loadAll();
-  toast('✓ Subtask restored');
+async function restoreSubtask(id, btn) {
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/subtasks/' + id + '/restore', {method:'POST'});
+    await loadAll();
+    toast('✓ Subtask restored');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
-async function deleteSubtask(id, name) {
+async function deleteSubtask(id, name, btn) {
   if (!confirm(`Permanently delete subtask "${name}"? This will delete all its history. This cannot be undone.`)) return;
-  await fetch('/api/subtasks/' + id, {method:'DELETE'});
-  await loadAll();
-  toast('Subtask deleted');
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/subtasks/' + id, {method:'DELETE'});
+    await loadAll();
+    toast('Subtask deleted');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 // ── RENDER: ACTIVE LIST ──────────────────────────────────────────────────
@@ -409,8 +454,8 @@ function renderTaskItem(t) {
         </div>
         <div class="row-actions">
           <button class="icon-btn" onclick="openEditTaskModal('${t.id}')" title="Edit">✎</button>
-          <button class="icon-btn" onclick="archiveTask('${t.id}')" title="Remove from routine">⤓</button>
-          <button class="icon-btn danger" onclick="deleteTask('${t.id}')" title="Delete permanently">✕</button>
+          <button class="icon-btn" onclick="archiveTask('${t.id}', this)" title="Remove from routine">⤓</button>
+          <button class="icon-btn danger" onclick="deleteTask('${t.id}', this)" title="Delete permanently">✕</button>
         </div>
       </div>
       <span class="subtask-label">Subtasks</span>
@@ -419,13 +464,13 @@ function renderTaskItem(t) {
           <div class="subtask-item">
             <span class="subtask-name" style="flex:1">${esc(s.name)} <span class="freq-badge">${freqLabel(s)}</span></span>
             <button class="icon-btn" onclick="openEditSubtaskModal('${s.id}')" title="Edit">✎</button>
-            <button class="icon-btn" onclick="archiveSubtask('${s.id}')" title="Remove from routine">⤓</button>
-            <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}')" title="Delete permanently">✕</button>
+            <button class="icon-btn" onclick="archiveSubtask('${s.id}', this)" title="Remove from routine">⤓</button>
+            <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}', this)" title="Delete permanently">✕</button>
           </div>
         `).join('')}
         <div class="subtask-add-row">
           <input type="text" id="sub-name-${t.id}" placeholder="New subtask name">
-          <button class="btn btn-ghost btn-sm" onclick="addSubtask('${t.id}')">+ Add Subtask</button>
+          <button class="btn btn-ghost btn-sm" onclick="addSubtask('${t.id}', this)">+ Add Subtask</button>
         </div>
       </div>
     </div>
@@ -456,8 +501,8 @@ function renderArchived() {
           <div class="task-desc">${esc(habitName(t.habit_id))}${t.description ? ' · ' + esc(t.description) : ''}</div>
         </div>
         <div class="row-actions">
-          <button class="btn btn-ghost btn-sm" onclick="restoreTask('${t.id}')">Restore</button>
-          <button class="icon-btn danger" onclick="deleteTask('${t.id}')" title="Delete permanently">✕</button>
+          <button class="btn btn-ghost btn-sm" onclick="restoreTask('${t.id}', this)">Restore</button>
+          <button class="icon-btn danger" onclick="deleteTask('${t.id}', this)" title="Delete permanently">✕</button>
         </div>
       </div>
     </div>
@@ -471,8 +516,8 @@ function renderArchived() {
           <div class="task-desc">subtask of ${esc(t.name)}</div>
         </div>
         <div class="row-actions">
-          <button class="btn btn-ghost btn-sm" onclick="restoreSubtask('${s.id}')">Restore</button>
-          <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}')" title="Delete permanently">✕</button>
+          <button class="btn btn-ghost btn-sm" onclick="restoreSubtask('${s.id}', this)">Restore</button>
+          <button class="icon-btn danger" onclick="deleteSubtask('${s.id}','${esc(s.name)}', this)" title="Delete permanently">✕</button>
         </div>
       </div>
     </div>
@@ -507,9 +552,15 @@ function showModal(title, bodyHtml, onSave) {
   document.getElementById('modal-overlay').addEventListener('click', e => {
     if (e.target.id === 'modal-overlay') closeModal();
   });
-  document.getElementById('modal-save-btn').onclick = async () => {
-    const ok = await onSave();
-    if (ok !== false) closeModal();
+  document.getElementById('modal-save-btn').onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (!setBtnLoading(btn, true)) return;
+    try {
+      const ok = await onSave();
+      if (ok !== false) closeModal();
+    } finally {
+      setBtnLoading(btn, false);
+    }
   };
 }
 
