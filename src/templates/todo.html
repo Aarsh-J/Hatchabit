@@ -72,7 +72,7 @@
       <input type="text" id="form-desc" placeholder="Optional details">
     </div>
   </div>
-  <button class="btn btn-primary" onclick="addTodo()">Add To-do</button>
+  <button class="btn btn-primary" onclick="addTodo(this)">Add To-do</button>
 </div>
 
 <!-- Todo List -->
@@ -105,26 +105,36 @@ function deadlineBadge(t) {
   return `<span class="deadline-badge ${cls}">${diffDays < 0 && t.is_done !== '1' ? 'overdue · ' : ''}${label}</span>`;
 }
 
-async function addTodo() {
+async function addTodo(btn) {
   const name     = document.getElementById('form-name').value.trim();
   const desc     = document.getElementById('form-desc').value.trim();
   const deadline = document.getElementById('form-deadline').value;
   if (!name) { toast('⚠ Task Name is required'); return; }
 
-  await fetch('/api/todos', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({name, description: desc, deadline})
-  });
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/todos', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name, description: desc, deadline})
+    });
 
-  ['form-name','form-desc','form-deadline'].forEach(id => document.getElementById(id).value='');
-  await loadAll();
-  toast('✓ To-do added');
+    ['form-name','form-desc','form-deadline'].forEach(id => document.getElementById(id).value='');
+    await loadAll();
+    toast('✓ To-do added');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
-async function toggleTodo(id) {
-  await fetch('/api/todos/' + id + '/toggle', {method:'POST'});
-  await loadAll();
+async function toggleTodo(id, checkbox) {
+  if (checkbox) checkbox.disabled = true;
+  try {
+    await fetch('/api/todos/' + id + '/toggle', {method:'POST'});
+    await loadAll();
+  } finally {
+    if (checkbox) checkbox.disabled = false;
+  }
 }
 
 function openEditTodoModal(id) {
@@ -151,12 +161,17 @@ function openEditTodoModal(id) {
   });
 }
 
-async function deleteTodo(id) {
+async function deleteTodo(id, btn) {
   const t = todos.find(x => x.id === id);
   if (!confirm(`Permanently delete "${t.name}"?`)) return;
-  await fetch('/api/todos/' + id, {method:'DELETE'});
-  await loadAll();
-  toast('To-do deleted');
+  if (!setBtnLoading(btn, true)) return;
+  try {
+    await fetch('/api/todos/' + id, {method:'DELETE'});
+    await loadAll();
+    toast('To-do deleted');
+  } finally {
+    setBtnLoading(btn, false);
+  }
 }
 
 function renderTodoList() {
@@ -178,14 +193,14 @@ function renderTodoItem(t) {
   return `
     <div class="todo-item${isDone ? ' done' : ''}">
       <div class="todo-item-row">
-        <input type="checkbox" class="todo-check" ${isDone ? 'checked' : ''} onchange="toggleTodo('${t.id}')">
+        <input type="checkbox" class="todo-check" ${isDone ? 'checked' : ''} onchange="toggleTodo('${t.id}', this)">
         <div class="todo-info">
           <div class="todo-name">${esc(t.name)} ${deadlineBadge(t)}</div>
           ${t.description ? `<div class="todo-desc">${esc(t.description)}</div>` : ''}
         </div>
         <div class="row-actions">
           <button class="icon-btn" onclick="openEditTodoModal('${t.id}')" title="Edit">✎</button>
-          <button class="icon-btn danger" onclick="deleteTodo('${t.id}')" title="Delete">✕</button>
+          <button class="icon-btn danger" onclick="deleteTodo('${t.id}', this)" title="Delete">✕</button>
         </div>
       </div>
     </div>
@@ -209,9 +224,15 @@ function showModal(title, bodyHtml, onSave) {
   document.getElementById('modal-overlay').addEventListener('click', e => {
     if (e.target.id === 'modal-overlay') closeModal();
   });
-  document.getElementById('modal-save-btn').onclick = async () => {
-    const ok = await onSave();
-    if (ok !== false) closeModal();
+  document.getElementById('modal-save-btn').onclick = async (e) => {
+    const btn = e.currentTarget;
+    if (!setBtnLoading(btn, true)) return;
+    try {
+      const ok = await onSave();
+      if (ok !== false) closeModal();
+    } finally {
+      setBtnLoading(btn, false);
+    }
   };
 }
 

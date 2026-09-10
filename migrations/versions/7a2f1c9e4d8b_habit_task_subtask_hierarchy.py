@@ -124,6 +124,12 @@ def upgrade():
 def downgrade():
     op.drop_index('uq_log_subtask_entry', table_name='log')
     op.drop_index('uq_log_task_entry', table_name='log')
+
+    # The old schema has no concept of a subtask-only log entry (task_id was
+    # NOT NULL). Subtasks themselves are dropped below, so drop their logs too.
+    bind = op.get_bind()
+    bind.execute(sa.text("DELETE FROM log WHERE task_id IS NULL"))
+
     op.create_unique_constraint('uq_log_entry', 'log', ['user_id', 'date', 'task_id', 'occurrence'])
     op.alter_column('log', 'task_id', nullable=False)
     op.drop_column('log', 'subtask_id')
@@ -132,7 +138,6 @@ def downgrade():
     op.add_column('task', sa.Column('subtask', sa.String(length=255), nullable=True))
     op.add_column('task', sa.Column('parent_id', sa.Integer(), nullable=True))
 
-    bind = op.get_bind()
     bind.execute(sa.text(
         "UPDATE task SET type = habit.name FROM habit WHERE task.habit_id = habit.id"
     ))

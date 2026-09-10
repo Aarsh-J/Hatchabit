@@ -56,6 +56,30 @@
 
 .streak-badge { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:20px; background:#ff8a6b15; color:#ff8a6b; border:1px solid #ff8a6b30; }
 
+.habit-desc {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.habit-collapse-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  width: 24px; height: 24px;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+.habit-collapse-btn:hover { color: var(--accent); border-color: var(--accent); }
+.tracker-group-items.collapsed { display: none; }
+
 /* Daily summary bar */
 .day-summary {
   background: var(--surface);
@@ -110,6 +134,13 @@ let logs  = [];
 let periodProgress = {tasks:{}, subtasks:{}};
 let streaks = {tasks:{}, subtasks:{}, overall:{current:0,best:0}};
 let currentDate = new Date();
+let collapsedHabits = new Set();
+
+function toggleHabitCollapse(habitId) {
+  if (collapsedHabits.has(habitId)) collapsedHabits.delete(habitId);
+  else collapsedHabits.add(habitId);
+  renderTracker();
+}
 
 async function init() {
   const [hr, tr, sr] = await Promise.all([
@@ -166,13 +197,18 @@ async function renderTracker() {
   container.innerHTML = habits.map(h => {
     const items = tasks.filter(t => t.habit_id === h.id);
     if (!items.length) return '';
+    const collapsed = collapsedHabits.has(h.id);
     return `
     <div class="tracker-group">
       <div class="type-header">
         <span class="type-badge" style="background:${h.color}15;border-color:${h.color}40;color:${h.color}">${esc(h.name)}</span>
+        ${h.description ? `<span class="habit-desc" title="${esc(h.description)}">${esc(h.description)}</span>` : ''}
         <div class="type-line"></div>
+        <button class="habit-collapse-btn" onclick="toggleHabitCollapse('${h.id}')" title="${collapsed ? 'Expand' : 'Minimize'}">${collapsed ? '▸' : '▾'}</button>
       </div>
-      ${items.map(t => renderTrackerTask(t, ds)).join('')}
+      <div class="tracker-group-items${collapsed ? ' collapsed' : ''}">
+        ${items.map(t => renderTrackerTask(t, ds)).join('')}
+      </div>
     </div>`;
   }).join('');
 

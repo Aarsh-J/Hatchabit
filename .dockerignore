@@ -4,5 +4,4 @@
 __pycache__
 *.pyc
 *.csv
-FUTURE_WORK.md
-taskflow_summary.md
+docs/

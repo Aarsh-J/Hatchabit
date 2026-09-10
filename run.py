@@ -14,7 +14,7 @@ except ImportError:
     print("Installing dependencies...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 
-from app import app
+from src.app import app
 
 print("\n✦ Hatchabit running at http://localhost:5050")
 print("  Press Ctrl+C to stop.\n")
